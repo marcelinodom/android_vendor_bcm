@@ -1,0 +1,18 @@
+#!/system/bin/sh
+
+state_dir="/data/misc/dhcpcd"
+
+if [ -z "${reason}" ] || -z "${interface}"; then
+	reason="$1"
+	interface="$2"
+fi
+
+for i in \
+	/system/etc/dhcpcd/dhcpcd.enter-hook \
+	/system/etc/dhcpcd/dhcpcd.d/* \
+	/system/etc/dhcpcd/dhcpcd.exit-hook
+do
+	if [ -f $i ] || [ -L $i ]; then
+		. "$i"
+	fi
+done

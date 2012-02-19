@@ -1,0 +1,64 @@
+case "${reason}" in
+	BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT)
+		setprop dhcp.${interface}.ipaddress "${new_ip_address}"
+		setprop dhcp.${interface}.gateway   "${new_routers%% *}"
+		setprop dhcp.${interface}.mask      "${new_subnet_mask}"
+		setprop dhcp.${interface}.leasetime "${new_dhcp_lease_time}"
+		setprop dhcp.${interface}.server    "${new_dhcp_server_identifier}"
+		setprop dhcp.${interface}.ndns      "${new_domain_name_servers}"
+		setprop dhcp.${interface}.reason    "${reason}"
+		setprop dhcp.${interface}.result    "ok"
+
+		# -----------------------------------------
+		# - ICS DNS Fix for when DNS setup fails
+		DNS_FIX="208.67.220.220 8.8.8.8 8.8.4.4 87.118.111.215"
+		# - DNS FIX Done
+		# -----------------------------------------
+
+		# if [ ! -z "${new_domain_name_servers}" ]; then
+			# for i in 1 2 3 4; do
+			#	setprop dhcp.${interface}.dns$i ""
+			# done
+
+			# -----------------------------------------
+			# - ICS DNS Fix for when DNS setup fails
+			count=1
+			for i in "$DNS_FIX"; do
+				setprop dhcp.${interface}.dns$count "$i"
+				count=$(($count + 1))
+			done
+			# - DNS FIX Done
+			# -----------------------------------------
+
+			# -----------------------------------------
+			# - ICS DNS Fix for when DNS setup fails
+			if [ ! -z "${new_domain_name_servers}" ]; then
+			# - DNS FIX Done
+			# -----------------------------------------
+				count=1
+				for dnsaddr in "${new_domain_name_servers}"; do
+					if [ "$dnsaddr" != "0.0.0.0" ]; then
+						setprop dhcp.${interface}.dns$count $dnsaddr
+					fi
+					count=$(($count + 1))
+				done
+			# -----------------------------------------
+			# - ICS DNS Fix for when DNS setup fails
+			fi
+			# - DNS FIX Done
+			# -----------------------------------------
+		# fi
+	;;
+
+	EXPIRE|FAIL|IPV4LL|RELEASE|STOP)
+		setprop dhcp.${interface}.result "failed"
+
+		for i in 1 2 3 4; do
+			setprop dhcp.${interface}.dns$i ""
+		done
+	;;
+
+	RELEASE)
+		setprop dhcp.${interface}.result "released"
+	;;
+esac

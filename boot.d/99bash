@@ -1,0 +1,3 @@
+#!/system/xbin/bash
+
+busybox mount --bind /system/bin/sh.bash /system/bin/sh

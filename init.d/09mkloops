@@ -1,0 +1,15 @@
+#!/system/bin/sh
+
+if [ ! -d /dev/loop ]; then
+	busybox mkdir /dev/loop
+fi
+
+for i in `seq 0 7`; do
+	if [ ! -b /dev/loop$i ]; then
+		busybox mknod /dev/loop$i b 7 $i
+	fi
+
+	if [ ! -b /dev/loop/$i ]; then
+		busybox mknod /dev/loop/$i b 7 $i
+	fi
+done

@@ -1,0 +1,11 @@
+#!/system/bin/sh
+
+if [ -f /system/etc/hostname ]; then
+	export HOSTNAME=$(busybox cat /system/etc/hostname)
+fi
+
+if [ -z "$HOSTNAME" ]; then
+	export HOSTNAME="localhost"
+fi
+
+echo $HOSTNAME > /proc/sys/kernel/hostname
