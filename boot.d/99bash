@@ -1,3 +1,5 @@
 #!/system/xbin/bash
 
-busybox mount --bind /system/bin/sh.bash /system/bin/sh
+busybox [ -e /system/bin/sh ] && busybox [ ! -L /system/bin/sh ] && SH=/system/bin/sh || SH=/system/xbin/sh
+
+busybox mount --bind /system/bin/sh.bash $SH
