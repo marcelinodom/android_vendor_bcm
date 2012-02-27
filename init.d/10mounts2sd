@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
-M2SD_VERSION="2.1.1"
-M2SD_PROPERTIES="dlcache:disable:boolean memcache:disable:boolean extfs:auto:fstype apps:enable:boolean data:disable:boolean dalvik:disable:boolean cache:enable:boolean swap:disable:boolean readahead:512:integer journal:disable:boolean fschk:enable:boolean"
+M2SD_VERSION="2.1.2"
+M2SD_PROPERTIES="dlcache:disable:boolean memcache:disable:boolean extfs:auto:fstype sysapps:disable:boolean apps:enable:boolean data:disable:boolean dalvik:disable:boolean cache:enable:boolean swap:disable:boolean readahead:512:integer journal:disable:boolean fschk:enable:boolean"
 M2SD_CONFIGS=/data/.m2sd
 M2SD_BB=/system/xbin/busybox.m2sd
 TOOLBOX=/system/bin/toolbox
@@ -60,6 +60,7 @@ case true in
 					$M2SD_BB echo " Usage: m2sd [index] [value]	: Change current value"
 					$M2SD_BB echo ""
 					$M2SD_BB echo " - apps [disable/enable]	: Enable/disable apps2sd"
+					$M2SD_BB echo " - sysapps [disable/enable]	: Enable/disable sysapps2sd (System app linking)"
 					$M2SD_BB echo " - dalvik [disable/enable]	: Enable/disable dalvik2sd"
 					$M2SD_BB echo " - data [disable/enable]	: Enable/disable data2sd (/data/data)"
 					$M2SD_BB echo " - cache [disable/enable]	: Enable/disable cache2sd"
@@ -94,6 +95,7 @@ case true in
 					$M2SD_BB echo "-------"
 					$M2SD_BB echo "Mounts2SD [`props get mounts2sd.status`]"
 					$M2SD_BB echo " - Apps [`props get mounts2sd.sdext.status.apps`]"
+					$M2SD_BB echo " - SysApps [`props get mounts2sd.sdext.status.sysapps`]"
 					$M2SD_BB echo " - Data [`props get mounts2sd.sdext.status.data`]"
 					$M2SD_BB echo " - Dalvik [`props get mounts2sd.sdext.status.dalvik`]"
 					$M2SD_BB echo " - Cache [`props get mounts2sd.cache.status`]"
@@ -204,6 +206,7 @@ case true in
 		PROP_EXTFS="`$M2SD_BB cat $M2SD_CONFIGS/.extfs`" 
 		PROP_DATA="`$M2SD_BB cat $M2SD_CONFIGS/.data`"
 		PROP_APPS="`$M2SD_BB cat $M2SD_CONFIGS/.apps`"
+		PROP_SYSAPPS="`$M2SD_BB cat $M2SD_CONFIGS/.sysapps`"
 		PROP_DALVIK="`$M2SD_BB cat $M2SD_CONFIGS/.dalvik`" 
 		PROP_SWAP="`$M2SD_BB cat $M2SD_CONFIGS/.swap`" 
 		PROP_READAHEAD="`$M2SD_BB cat $M2SD_CONFIGS/.readahead`"
@@ -408,6 +411,60 @@ case true in
 													doLog w "Error while linking /data/$x to /sd-ext/$x!"
 												fi
 											done
+
+											[ "$PROP_SYSAPPS" = "enable" ] && props set mounts2sd.sdext.status.sysapps "loaded"
+											[ "$PROP_SYSAPPS" = "enable" ] && SYSAPPS_TO="/sd-ext/app-system" || SYSAPPS_TO="/data/app-system"
+											[ "$PROP_SYSAPPS" = "enable" ] && SYSAPPS_FROM="/data/app-system" || SYSAPPS_FROM="/sd-ext/app-system"
+
+											if [ -d $SYSAPPS_FROM ] && [ ! -z "`$M2SD_BB ls -v $SYSAPPS_FROM`" ]; then
+												doLog v "Moving content from $SYSAPPS_FROM to $SYSAPPS_TO..."
+
+												if [ ! -d $SYSAPPS_TO ]; then
+													$M2SD_BB mkdir $SYSAPPS_TO
+													$M2SD_BB chown 1000.1000 $SYSAPPS_TO
+													$M2SD_BB chmod 771 $SYSAPPS_TO
+												fi
+
+												for tmp in $SYSAPPS_FROM/*; do
+													tmpn="`$M2SD_BB basename $tmp`"
+
+													if [ -e $SYSAPPS_TO/$tmpn ]; then
+														$M2SD_BB rm -rf $SYSAPPS_TO/$tmpn
+													fi
+
+													$M2SD_BB mv -f $SYSAPPS_FROM/$tmpn $SYSAPPS_TO/
+												done
+
+												if [ ! -z "`$M2SD_BB ls -v $SYSAPPS_FROM`" ]; then
+													doLog e "Not all from $SYSAPPS_FROM could be moved to $SYSAPPS_TO. Check available disk space!"
+
+												else
+													$M2SD_BB rm -rf $SYSAPPS_FROM
+												fi
+											fi
+
+											$M2SD_BB mount -o remount,rw /system
+
+											for tmp in /system/app/*; do
+												if [ -L $tmp ] && [ ! -e "`$M2SD_BB readlink $tmp`" ]; then
+													$M2SD_BB rm -rf $tmp
+												fi
+											done
+
+											if [ -d $SYSAPPS_TO ]; then
+												doLog v "Linking content from $SYSAPPS_TO to /system/app..."
+
+												for tmp in $SYSAPPS_TO/*; do
+													tmpn="`$M2SD_BB basename $tmp`"
+
+													if [ ! -e /system/app/$tmpn ] || [ ! -L /system/app/$tmpn ]; then
+														[ -e  ] && $M2SD_BB rm -rf /system/app/$tmpn
+														$M2SD_BB ln -s $tmp /system/app/
+													fi
+												done
+											fi
+
+											$M2SD_BB mount -o remount,ro /system
 
 										else
 											doLog e "Error while mounting the sd-ext partition!"
