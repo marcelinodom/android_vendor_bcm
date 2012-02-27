@@ -22,7 +22,8 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/bin/props:system/bin/props \
     vendor/bcm/bin/sh.bash:system/bin/sh.bash \
     vendor/bcm/bin/su.bash:system/bin/su.bash \
-    vendor/bcm/bin/sysinit:system/bin/sysinit
+    vendor/bcm/bin/sysinit:system/bin/sysinit \
+    vendor/bcm/bin/sh:system/bin/sh
 
 PRODUCT_COPY_FILES += \
     vendor/bcm/xbin/bash:system/xbin/bash \
