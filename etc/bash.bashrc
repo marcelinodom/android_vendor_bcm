@@ -13,6 +13,7 @@ fi
 
 alias sh="bash"
 alias su="su -c bash"
+alias ls="ls -p"
 
 if [ ! -z "$PS1" ]; then
 	# check the window size after each command and, if necessary,
@@ -29,9 +30,9 @@ if [ ! -z "$PS1" ]; then
 	fi
 
 	# set a fancy prompt (non-color, overwrite the one in /etc/profile)
-	PS1='${debian_chroot:+($debian_chroot)}$USER@\h:\w\$ '
+	PS1='${debian_chroot:+($debian_chroot)}$USER@\h:\W\$ '
 fi
 
-if [ -e /mnt/sdcard/.bashrc ]; then
-	. /mnt/sdcard/.bashrc
+if [ -e /data/.bashrc ]; then
+	. /data/.bashrc
 fi
