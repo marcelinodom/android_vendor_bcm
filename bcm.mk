@@ -27,4 +27,4 @@ PRODUCT_COPY_FILES += \
 
 PRODUCT_COPY_FILES += \
     vendor/bcm/xbin/bash:system/xbin/bash \
-    vendor/bcm/xbin/busybox:system/xbin/busybox
+    vendor/bcm/xbin/busybox.m2sd:system/xbin/busybox.m2sd
