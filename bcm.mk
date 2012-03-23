@@ -50,6 +50,9 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/lib/libext2_profile.so:system/lib/libext2_profile.so \
     vendor/bcm/lib/libext2_uuid.so:system/lib/libext2_uuid.so
 
+PRODUCT_COPY_FILES += \
+    packages/wallpapers/LivePicker/android.software.live_wallpaper.xml:system/etc/permissions/android.software.live_wallpaper.xml
+
 BUILD_DATE := $(shell date +%Y%M%d)
 BUILD_USER := $(shell whoami)
 BUILD_VERSION := RC2.2
