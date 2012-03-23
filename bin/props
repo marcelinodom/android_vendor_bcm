@@ -8,7 +8,7 @@ if [ ! -d /tmp ]; then
 	busybox mkdir /tmp
 	busybox chown 1000.2001 /tmp
 	busybox chmod 771 /tmp
-	busybox mount -t tmpfs -o size=42M,nr_inodes=42k,mode=0770 tmpfs /tmp
+	busybox mount -t tmpfs -o size=128M,nr_inodes=42k,mode=0770 tmpfs /tmp
 	busybox mkdir /tmp/props
 	busybox chown 1000.1000 /tmp/props
 	busybox chmod 771 /tmp/props
