@@ -1,0 +1,10 @@
+#!/system/bin/sh
+
+if busybox [ -e /data/data/com.android.providers.settings/databases/settings.db ]; then
+	value=$(sqlite3 /data/data/com.android.providers.settings/databases/settings.db "select value from secure where name = 'sys_storage_threshold_percentage'")
+
+	if busybox [ "$value" != "1" ]; then
+		sqlite3 /data/data/com.android.providers.settings/databases/settings.db "insert into secure (name, value) VALUES('sys_storage_threshold_percentage','1')"
+		sqlite3 /data/data/com.android.providers.settings/databases/settings.db "insert into gservices (name, value) VALUES('sys_storage_threshold_percentage','1')"
+	fi
+fi

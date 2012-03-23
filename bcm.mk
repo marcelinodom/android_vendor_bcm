@@ -10,6 +10,7 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/init.d/05hostname:system/etc/init.d/05hostname \
     vendor/bcm/init.d/09mkloops:system/etc/init.d/09mkloops \
     vendor/bcm/init.d/01sysctl:system/etc/init.d/01sysctl \
+    vendor/bcm/init.d/90threshold:system/etc/init.d/90threshold \
     vendor/bcm/boot.d/99bash:system/etc/boot.d/99bash
 
 PRODUCT_COPY_FILES += \
