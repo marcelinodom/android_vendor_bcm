@@ -31,7 +31,8 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/bin/sh.bash:system/bin/sh.bash \
     vendor/bcm/bin/su.bash:system/bin/su.bash \
     vendor/bcm/bin/sysinit:system/bin/sysinit \
-    vendor/bcm/bin/sh:system/bin/sh
+    vendor/bcm/bin/sh:system/bin/sh \
+    vendor/bcm/bin/e2fsck:system/bin/e2fsck
 
 PRODUCT_COPY_FILES += \
     vendor/bcm/xbin/bash:system/xbin/bash \
@@ -39,6 +40,14 @@ PRODUCT_COPY_FILES += \
 
 PRODUCT_COPY_FILES += \
     vendor/bcm/media/bootanimation.zip:system/media/bootanimation.zip
+
+PRODUCT_COPY_FILES += \
+    vendor/bcm/lib/libext2_blkid.so:system/lib/libext2_blkid.so \
+    vendor/bcm/lib/libext2_com_err.so:system/lib/libext2_com_err.so \
+    vendor/bcm/lib/libext2_e2p.so:system/lib/libext2_e2p.so \
+    vendor/bcm/lib/libext2fs.so:system/lib/libext2fs.so \
+    vendor/bcm/lib/libext2_profile.so:system/lib/libext2_profile.so \
+    vendor/bcm/lib/libext2_uuid.so:system/lib/libext2_uuid.so
 
 BUILD_DATE := $(shell date +%Y%M%d)
 BUILD_USER := $(shell whoami)
