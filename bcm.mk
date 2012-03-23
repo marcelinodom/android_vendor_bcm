@@ -1,3 +1,10 @@
+DEVICE_PACKAGE_OVERLAYS += vendor/bcm/overlay
+
+PRODUCT_PACKAGES += \
+    Stk \
+    Camera \
+    Launcher2
+
 PRODUCT_COPY_FILES += \
     vendor/bcm/init.d/10mounts2sd:system/etc/init.d/10mounts2sd \
     vendor/bcm/init.d/05hostname:system/etc/init.d/05hostname \
@@ -16,7 +23,8 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/etc/hostname:system/etc/hostname \
     vendor/bcm/etc/hosts:system/etc/hosts \
     vendor/bcm/etc/shells:system/etc/shells \
-    vendor/bcm/etc/SuplRootCert:system/etc/SuplRootCert 
+    vendor/bcm/etc/SuplRootCert:system/etc/SuplRootCert \
+    vendor/bcm/etc/sysctl.conf:system/etc/sysctl.conf 
 
 PRODUCT_COPY_FILES += \
     vendor/bcm/bin/props:system/bin/props \
@@ -28,3 +36,24 @@ PRODUCT_COPY_FILES += \
 PRODUCT_COPY_FILES += \
     vendor/bcm/xbin/bash:system/xbin/bash \
     vendor/bcm/xbin/busybox.m2sd:system/xbin/busybox.m2sd
+
+PRODUCT_COPY_FILES += \
+    vendor/bcm/media/bootanimation.zip:system/media/bootanimation.zip
+
+BUILD_DATE := $(shell date +%Y%M%d)
+BUILD_USER := $(shell whoami)
+BUILD_VERSION := RC2.2
+BUILD_UPDATE := 4
+
+ifeq ($(NIGHTLY_BUILD),true)
+    BUILD_VERSION := $(BUILD_VERSION)U$(BUILD_UPDATE)-$(BUILD_DATE)
+else
+    BUILD_VERSION := $(BUILD_VERSION)U$(BUILD_UPDATE)
+endif
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.build.date.utc=0 \
+    ro.build.display.id=BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool \
+    ro.build.romversion=BCM-$(BUILD_VERSION)U$(BUILD_UPDATE) \
+    ro.modversion=BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool \
+    ro.cm.version=9.0.0-RC0-$(BUILD_DATE)
