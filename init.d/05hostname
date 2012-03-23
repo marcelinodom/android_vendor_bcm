@@ -36,3 +36,4 @@ fi
 busybox mount -o remount,ro /system
 
 busybox echo $HOSTNAME > /proc/sys/kernel/hostname
+setprop net.hostname $HOSTNAME
