@@ -10,10 +10,13 @@ fi
 
 busybox mount -o remount,rw /system
 
-if busybox [ ! -f /system/etc/hosts ] || busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.1'`" ]; then
+if busybox [ ! -f /system/etc/hosts ]; then
 	busybox echo "127.0.0.1 localhost localdomain" > /system/etc/hosts
 
-elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.1' | grep 'localhost'`" ]; then
+elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.1'`" ]; then
+	busybox echo "127.0.0.1 localhost localdomain" >> /system/etc/hosts
+
+elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.1' | busybox grep 'localhost'`" ]; then
 	busybox mv /system/etc/hosts /system/etc/hosts.temp
 	busybox cat /system/etc/hosts.temp | busybox sed 's/\(127\.0\.0\.1\)[ \t]*\([^ \t\n\r\s]*\)/\1 localhost/' >> /system/etc/hosts
 	busybox rm -rf /system/etc/hosts.temp
@@ -21,7 +24,7 @@ fi
 
 if busybox [ "$HOSTNAME" != "localhost" ]; then
 	if busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.2'`" ]; then
-		busybox echo "127.0.0.2 $HOSTNAME" > /system/etc/hosts
+		busybox echo "127.0.0.2 $HOSTNAME" >> /system/etc/hosts
 
 	elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.2' | grep "$HOSTNAME"`" ]; then
 		busybox mv /system/etc/hosts /system/etc/hosts.temp
