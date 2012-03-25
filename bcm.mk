@@ -28,7 +28,6 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/etc/sysctl.conf:system/etc/sysctl.conf 
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/bin/props:system/bin/props \
     vendor/bcm/bin/sh.bash:system/bin/sh.bash \
     vendor/bcm/bin/su.bash:system/bin/su.bash \
     vendor/bcm/bin/sysinit:system/bin/sysinit \
