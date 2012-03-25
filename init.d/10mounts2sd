@@ -632,25 +632,25 @@ for loopwrapper in true; do
 						done
 
 						# Make sure that the directory tree in /data is complete
-						# This is needed because of r-mount
-						while read x; do
-							INP_FOLDER="`$BB echo $x | $BB cut -d ' ' -f 2`"
-							EXT_FOLDER="`$BB echo $INP_FOLDER | $BB sed 's/^\/data/\/sd\-ext/'`"
-							INP_PERMISSIONS="`$BB echo $x | $BB cut -d ' ' -f 3`"
-							INP_OWNER="`$BB echo $x | $BB cut -d ' ' -f 4`.`$BB echo $x | $BB cut -d ' ' -f 5`"
-
-							if $BB [ ! -d $INP_FOLDER ]; then
-								$BB mkdir $INP_FOLDER
-								$TOOLBOX chown $INP_OWNER
-								$TOOLBOX chmod $INP_PERMISSIONS
-
-								# Remove un-used left overs from switching between r-mount and regular mount
-								if $BB [ -e $EXT_FOLDER ]; then
-									$BB $EXT_FOLDER
-								fi
-							fi
-
-						done <<<"`$BB cat /init.rc | $BB grep mkdir | $BB grep data | $BB tr -s ' '`"
+						# This is needed because of r-mount 
+						## while read x; do
+						## 	INP_FOLDER="`$BB echo $x | $BB cut -d ' ' -f 2`"
+						## 	EXT_FOLDER="`$BB echo $INP_FOLDER | $BB sed 's/^\/data/\/sd\-ext/'`"
+						## 	INP_PERMISSIONS="`$BB echo $x | $BB cut -d ' ' -f 3`"
+						## 	INP_OWNER="`$BB echo $x | $BB cut -d ' ' -f 4`.`$BB echo $x | $BB cut -d ' ' -f 5`"
+						## 
+						## 	if $BB [ ! -d $INP_FOLDER ]; then
+						## 		$BB mkdir $INP_FOLDER
+						## 		$TOOLBOX chown $INP_OWNER
+						## 		$TOOLBOX chmod $INP_PERMISSIONS
+						## 
+						## 		# Remove un-used left overs from switching between r-mount and regular mount
+						## 		if $BB [ -e $EXT_FOLDER ]; then
+						## 			$BB $EXT_FOLDER
+						## 		fi
+						## 	fi
+						## 
+						## done <"`$BB cat /init.rc | $BB grep mkdir | $BB grep data | $BB tr -s ' '`"
 
 					else
 						doLog e "Error while mounting the sd-ext partition!"
