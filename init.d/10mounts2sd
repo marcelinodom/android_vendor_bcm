@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
-M2SD_VERSION="3.0.0"
-M2SD_PROPERTIES="debug:disable:boolean rmount:disable:boolean noatime:disable:boolean dlcache:disable:boolean extfs:auto:fstype apps:enable:boolean data:disable:boolean cmdalvik:disable:boolean dalvik:disable:boolean cache:auto:option swap:disable:boolean readahead:512:integer journal:disable:boolean fschk:enable:boolean"
+M2SD_VERSION="3.0.2"
+M2SD_PROPERTIES="debug:disable:boolean rmount:disable:boolean noatime:disable:boolean dlcache:disable:boolean extfs:auto:fstype apps:enable:boolean data:disable:boolean cmdalvik:disable:boolean dalvik:disable:boolean cache:auto:option swap:disable:boolean readahead:512:integer journal:auto:option fschk:enable:boolean"
 M2SD_CONFIGS=/system/etc/m2sd
 BB=/system/xbin/busybox.m2sd
 TOOLBOX=/system/bin/toolbox
@@ -100,14 +100,17 @@ for loopwrapper in true; do
 
 			case "$?" in
 				"1") 
-					busybox echo "Missing Mounts2SD Busybox!"
+					doLog w "Missing M2SD Busybox. Using ROM buildin instead."
+					BB="busybox"
+				;;
+
+				*)
+					$TOOLBOX log -p e -t mounts2sd "Missing Busybox!"
+
+					# Break loopwrapper
+					break
 				;;
 			esac
-
-			$TOOLBOX log -p e -t mounts2sd "Missing Mounts2SD Busybox!"
-
-			# Break loopwrapper
-			break
 		;;
 	esac
 
@@ -133,7 +136,7 @@ for loopwrapper in true; do
 					$BB echo " - cache [disable/enable/auto]	: Enable/disable cache2sd"
 					$BB echo " - dlcache [disable/enable]	: Replace /cache/download/ instead of /cache/"
 					$BB echo " - swap [disable/enable]	: Enable/disable swap"
-					$BB echo " - journal [disable/enable]	: Enable/disable ext(3,4) journal on sd-ext"
+					$BB echo " - journal [disable/enable/auto]	: Enable/disable ext(3,4) journal on sd-ext"
 					$BB echo " - fschk [disable/enable]	: Enable/disable file system check during boot"
 					$BB echo " - noatime [disable/enable]	: Mount /data and /sd-ext with noatime"
 					$BB echo " - rmount [disable/enable]	: Reversed mount. sd-ext on /data and data on /sd-ext"
@@ -384,8 +387,11 @@ for loopwrapper in true; do
 					fi
 
 					for i in $MMC_PARTITIONS; do
-						if $BB [ ! -z "`$BB blkid | $BB grep $i | $BB grep " TYPE"`" ]; then
+						if $BB [ ! -z "`$BB blkid | $BB grep $i | $BB grep " TYPE="`" ]; then
 							FS_TYPE=`$BB blkid $i | $BB sed 's/.*TYPE=\"\([^\"]*\)\".*/\1/g'`
+
+							doLog v "Checking file system type $FS_TYPE"
+
 							case "$FS_TYPE" in 
 								"swap")
 									$BB [ -z "$MMC_SWAP" ] && MMC_SWAP="$i"
@@ -404,6 +410,8 @@ for loopwrapper in true; do
 
 						else
 							FS_NUMBER="`$BB fdisk -l $MMC_DEVICE | $BB grep $i | $BB tr -s " " | $BB rev | $BB cut -d " " -f 2 | $BB rev`"
+
+							doLog v "Checking file system number $FS_NUMBER"
 
 							case "$FS_NUMBER" in 
 								"82")
@@ -433,7 +441,7 @@ for loopwrapper in true; do
 		done
 
 		# Activate SWAP if we have any and if it is set to be activated
-		if [ -z "$MMC_SWAP" ] && $BB [ "$BOOL_SWAP" != "true" ]; then
+		if [ ! -z "$MMC_SWAP" ]; then
 			doProp set mounts2sd.swap.device "$MMC_SWAP"
 
 			if $BB [ "$PROP_SWAP" = "enable" ]; then
@@ -444,9 +452,12 @@ for loopwrapper in true; do
 					doProp set mounts2sd.swap.status "loaded"
 
 				else
-					doLog w "Could not activate SWAP. Not supported by the kernel!"
+					doLog w "Could not activate SWAP. Check kernel support!"
 				fi
 			fi
+
+		elif $BB [ "$PROP_SWAP" = "enable" ]; then
+			doLog v "Did not find any SWAP partition. Skipping..."
 		fi
 
 		# Activate a2sd that will move content from data to sd-ext
@@ -481,21 +492,23 @@ for loopwrapper in true; do
 					fi
 				fi
 
-				if $BB [ "$MMC_SDEXT_FS" = "ext4" ]; then
-					$BB [ ! -z "`$BB which tune2fs`" ] && CMD_TUNE2FS="`$BB which tune2fs`" || CMD_TUNE2FS="$BB tune2fs"
+				if $BB [ "$PROP_JOURNAL" != "auto" ]; then
+					if $BB [ "$MMC_SDEXT_FS" = "ext4" ]; then
+						$BB [ ! -z "`$BB which tune2fs`" ] && CMD_TUNE2FS="`$BB which tune2fs`" || CMD_TUNE2FS="$BB tune2fs"
 
-					if $BB [ "$PROP_JOURNAL" = "disable" ]; then
+						if $BB [ "$PROP_JOURNAL" = "disable" ]; then
+							doLog v "Disabling journal on sd-ext..."
+							$CMD_TUNE2FS -O ^has_journal $MMC_SDEXT
+
+						else 	
+							doLog v "Enabling journal on sd-ext..."
+							$CMD_TUNE2FS -O has_journal $MMC_SDEXT
+						fi
+
+					elif $BB [ "$MMC_SDEXT_FS" = "ext3" ]; then
 						doLog v "Disabling journal on sd-ext..."
-						$CMD_TUNE2FS -O ^has_journal $MMC_SDEXT
-
-					else 	
-						doLog v "Enabling journal on sd-ext..."
-						$CMD_TUNE2FS -O has_journal $MMC_SDEXT
+						$BB [ -z "$OPTIONS" ] && OPTIONS="noload" || OPTIONS="$OPTIONS,noload"
 					fi
-
-				elif $BB [ "$MMC_SDEXT_FS" = "ext3" ]; then
-					doLog v "Disabling journal on sd-ext..."
-					$BB [ -z "$OPTIONS" ] && OPTIONS="noload" || OPTIONS="$OPTIONS,noload"
 				fi
 
 				if $BB [ "$PROP_NOATIME" = "enable" ]; then
@@ -547,7 +560,7 @@ for loopwrapper in true; do
 								$BB chmod 771 /data/$x
 							fi
 
-							if $BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ]; then
+							if $BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ] && $BB [ ! -z "`$BB find -type f /sd-ext/$x`" ]; then
 								doLog v "Reverting /sd-ext/$x back to /data/$x..."
 
 								if $BB [ "$x" != "dalvik-cache" ]; then
@@ -573,6 +586,19 @@ for loopwrapper in true; do
 								fi
 
 							elif [ -e /sd-ext/$x ]; then
+								DIRS="`$BB find -type d /sd-ext/$x`"
+
+								# Handle cases where init.rc creates muti-level folder structure but all are empty
+								if [ ! -z "$DIRS" ]; then
+									for n in $DIRS; do
+										c="`$BB echo $n | $BB sed 's/^\/sd\-ext\//\/data\//'`"
+
+										if $BB [ ! -d $c ]; then
+											$BB mv -f $n $c
+										fi
+									done
+								fi
+
 								$BB rm -rf /sd-ext/$x
 							fi
 						done
@@ -587,7 +613,7 @@ for loopwrapper in true; do
 								$BB chmod 771 /sd-ext/$x
 							fi
 
-							if $BB [ -d /data/$x ] && $BB [ ! -L /data/$x ] && $BB [ ! -z "`$BB ls -v /data/$x`" ]; then
+							if $BB [ -d /data/$x ] && $BB [ ! -L /data/$x ] && $BB [ ! -z "`$BB ls -v /data/$x`" ] && $BB [ ! -z "`$BB find -type f /data/$x`" ]; then
 								doLog v "Moving content from /data/$x to /sd-ext/$x..."
 
 								if $BB [ "$x" != "dalvik-cache" ]; then
@@ -615,6 +641,22 @@ for loopwrapper in true; do
 								$BB mkdir /data/$x
 								$BB chown 1000.1000 /data/$x
 								$BB chmod 771 /data/$x
+
+							else
+								DIRS="`$BB find -type d /data/$x`"
+
+								# Handle cases where init.rc creates muti-level folder structure but all are empty
+								if [ ! -z "$DIRS" ]; then
+									for n in $DIRS; do
+										c="`$BB echo $n | $BB sed 's/^\/data\//\/sd\-ext\//'`"
+
+										if $BB [ ! -d $c ]; then
+											$BB mv -f $n $c
+										fi
+									done
+
+									$BB rm -rf /data/$x/*
+								fi
 							fi
 
 							doLog v "Creating link between /data/$x and /sd-ext/$x..."
@@ -704,7 +746,7 @@ for loopwrapper in true; do
 			$BB [ "$PROP_DLCACHE" = "enable" ] && CACHE_LOCATION="/cache/download" || CACHE_LOCATION="/cache"
 
 			if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " $CACHE_LOCATION "`" ]; then
-				doLog v "Umounting $CACHE_LOCATION to make the directory ready for linking..."
+				doLog v "Umounting pre-mounted $CACHE_LOCATION..."
 				$BB umount /cache
 			fi
 
