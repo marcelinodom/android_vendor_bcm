@@ -390,8 +390,6 @@ for loopwrapper in true; do
 						if $BB [ ! -z "`$BB blkid | $BB grep $i | $BB grep " TYPE="`" ]; then
 							FS_TYPE=`$BB blkid $i | $BB sed 's/.*TYPE=\"\([^\"]*\)\".*/\1/g'`
 
-							doLog v "Checking file system type $FS_TYPE"
-
 							case "$FS_TYPE" in 
 								"swap")
 									$BB [ -z "$MMC_SWAP" ] && MMC_SWAP="$i"
@@ -410,8 +408,6 @@ for loopwrapper in true; do
 
 						else
 							FS_NUMBER="`$BB fdisk -l $MMC_DEVICE | $BB grep $i | $BB tr -s " " | $BB rev | $BB cut -d " " -f 2 | $BB rev`"
-
-							doLog v "Checking file system number $FS_NUMBER"
 
 							case "$FS_NUMBER" in 
 								"82")
