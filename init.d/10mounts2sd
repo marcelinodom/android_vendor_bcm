@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-M2SD_VERSION="3.0.2"
+M2SD_VERSION="3.0.4"
 M2SD_PROPERTIES="debug:disable:boolean rmount:disable:boolean noatime:disable:boolean dlcache:disable:boolean extfs:auto:fstype apps:enable:boolean data:disable:boolean cmdalvik:disable:boolean dalvik:disable:boolean cache:auto:option swap:disable:boolean readahead:512:integer journal:auto:option fschk:enable:boolean"
 M2SD_CONFIGS=/system/etc/m2sd
 BB=/system/xbin/busybox.m2sd
@@ -82,17 +82,7 @@ for loopwrapper in true; do
 	# This is a hacked way of checking whether or not the m2sd busybox exists or not.
 	# Some toolbox versions are so limited that they don't even support basic echo command, and most are missing things like [ to make proper conditional checks using if and else.
 	case "$?" in
-		"1") 
-			CALL_BASENAME="`$BB basename $0`"
-
-			if $BB [ ! -d $M2SD_CONFIGS ]; then
-				doWrite start
-				$BB mkdir -p $M2SD_CONFIGS
-				$BB chown 1000.1000 $M2SD_CONFIGS
-				$BB chmod 0771 $M2SD_CONFIGS
-				doWrite stop
-			fi
-		;;
+		"1") ;;
 
 		*)
 			# Maybe we have a basic busybox available
@@ -114,6 +104,16 @@ for loopwrapper in true; do
 		;;
 	esac
 
+	CALL_BASENAME="`$BB basename $0`"
+
+	if $BB [ ! -d $M2SD_CONFIGS ]; then
+		doWrite start
+		$BB mkdir -p $M2SD_CONFIGS
+		$BB chown 1000.1000 $M2SD_CONFIGS
+		$BB chmod 0771 $M2SD_CONFIGS
+		doWrite stop
+	fi
+
 	if $BB [ "$CALL_BASENAME" = "m2sd" ] || ( $BB [ ! -z "$1" ] && $BB [ "`$BB basename $1`" = "m2sd" ] ); then
 		if $BB [ "`$BB id | $BB sed -ne "s/^uid=\([0-9]\+\)[^0-9].*$/\1/p"`" != "0" ]; then
 			$BB echo "You need to be root to access m2sd configurations. Type 'su' in console to gain superuser privileges!"
@@ -123,23 +123,27 @@ for loopwrapper in true; do
 			$BB [ "$CALL_BASENAME" = "m2sd" ] && IVALUE="$2" || IVALUE="$3"
 
 			case "$INAME" in
-				""|"help"|"--help"|"-h") 
+				""|"help"|"--help"|"-h")
 					$BB echo ""
 					$BB echo " Usage: m2sd [index]		: Get value from index" 
 					$BB echo " Usage: m2sd [index] [value]	: Change current value"
 					$BB echo ""
-					$BB echo " - debug [disable/enable]	: Enable/disable debugging"
-					$BB echo " - apps [disable/enable]	: Enable/disable apps2sd"
-					$BB echo " - dalvik [disable/enable]	: Enable/disable dalvik2sd"
-					$BB echo " - cmdalvik [disable/enable]	: Enable/disable CyanogenMod dalvik fix (/cache to /data)"
-					$BB echo " - data [disable/enable]	: Enable/disable data2sd (/data/data)"
 					$BB echo " - cache [disable/enable/auto]	: Enable/disable cache2sd"
-					$BB echo " - dlcache [disable/enable]	: Replace /cache/download/ instead of /cache/"
+ 					$BB echo " - debug [disable/enable]	: Enable/disable debugging"
+					$BB echo " - apps [disable/enable]	: Enable/disable apps2sd"
+
+					if $BB [ "`doProp get mounts2sd.status`" != "safe-mode" ]; then
+						$BB echo " - dalvik [disable/enable]	: Enable/disable dalvik2sd"
+						$BB echo " - cmdalvik [disable/enable]	: Enable/disable CyanogenMod dalvik fix (/cache to /data)"
+						$BB echo " - data [disable/enable]	: Enable/disable data2sd (/data/data)"
+						$BB echo " - dlcache [disable/enable]	: Replace /cache/download/ instead of /cache/"
+						$BB echo " - rmount [disable/enable]	: Reversed mount. sd-ext on /data and data on /sd-ext"
+					fi
+
 					$BB echo " - swap [disable/enable]	: Enable/disable swap"
-					$BB echo " - journal [disable/enable/auto]	: Enable/disable ext(3,4) journal on sd-ext"
+					$BB echo " - journal [disable/enable/auto]: Enable/disable ext(3,4) journal on sd-ext"
 					$BB echo " - fschk [disable/enable]	: Enable/disable file system check during boot"
 					$BB echo " - noatime [disable/enable]	: Mount /data and /sd-ext with noatime"
-					$BB echo " - rmount [disable/enable]	: Reversed mount. sd-ext on /data and data on /sd-ext"
 					$BB echo " - readahead [0-9]		: Set sdcard readahead (In kb)"
 					$BB echo " - extfs [auto/<fs-type>]	: Force a specific fs type on /sd-ext mount"
 					$BB echo ""
@@ -153,6 +157,11 @@ for loopwrapper in true; do
 					$BB echo "--------"
 					$BB echo " - fixperm			: Do a one time permissions check and fix them if needed"
 					$BB echo ""
+
+					if $BB [ "`doProp get mounts2sd.status`" = "safe-mode" ]; then
+						$BB echo "--------------"
+						$BB echo "Mounts2SD is currently running in safe-mode and some options is therefore hidden/disabled. In order to use all of the options of the script, your ROM must use the sysinit execute method of handling init.d scripts. Your ROM is currently using the sysinit service method which is highly unstable."
+					fi
 				;;
 
 				"log")
@@ -282,8 +291,8 @@ for loopwrapper in true; do
 		if $BB [ -e /sys/class/leds/green/brightness ]; then
 			$BB echo 1 > /sys/class/leds/green/brightness
 
-		elif [ -e /sys/class/leds/button-backlight/brightness ]; then
-			echo 255 > /sys/class/leds/button-backlight/brightness
+		elif $BB [ -e /sys/class/leds/button-backlight/brightness ]; then
+			$BB echo 255 > /sys/class/leds/button-backlight/brightness
 		fi
 
 		# Activate debug if selected
@@ -293,7 +302,7 @@ for loopwrapper in true; do
 		fi
 
 		for i in $SDEXT_PATH /props; do
-			if [ ! -d $i ]; then
+			if $BB [ ! -d $i ]; then
 				$BB mkdir $i
 			fi
 		done
@@ -311,7 +320,7 @@ for loopwrapper in true; do
 		done
 
 		# Get all settings
-		if $BB [ -z "`$BB cat /init.rc | $BB grep exec | $BB grep sysinit`" ] && $BB [ -z "`$BB cat /system/etc/init.local.rc | $BB grep exec | $BB grep sysinit`" ]; then
+		if $BB [ -z "`$BB cat /init.rc | $BB grep exec | $BB grep sysinit`" ] && ( $BB [ ! -e /system/etc/init.local.rc ] || $BB [ -z "`$BB cat /system/etc/init.local.rc | $BB grep exec | $BB grep sysinit`" ] ); then
 			doLog w "SYSINIT MISSING: This script works best using sysinit as an executable rather than an service! Switching to safe mode..."
 
 			# Because running sysinit as an service allows the rest of the boot process to run at the same time,
@@ -323,12 +332,14 @@ for loopwrapper in true; do
 			PROP_DALVIK="disable"
 			PROP_CMDALVIK="disable"
 			PROP_DATA="disable"
+			PROP_RMOUNT="disable"
 			M2SD_STATUS="safe-mode"
 		else
 			PROP_DLCACHE="`$BB cat $M2SD_CONFIGS/.dlcache`"
 			PROP_DALVIK="`$BB cat $M2SD_CONFIGS/.dalvik`" 
 			PROP_CMDALVIK="`$BB cat $M2SD_CONFIGS/.cmdalvik`"
 			PROP_DATA="`$BB cat $M2SD_CONFIGS/.data`"
+			PROP_RMOUNT="`$BB cat $M2SD_CONFIGS/.rmount`"
 			M2SD_STATUS="loaded"
 		fi
 
@@ -340,7 +351,6 @@ for loopwrapper in true; do
 		PROP_JOURNAL="`$BB cat $M2SD_CONFIGS/.journal`" 
 		PROP_FSCHK="`$BB cat $M2SD_CONFIGS/.fschk`"
 		PROP_NOATIME="`$BB cat $M2SD_CONFIGS/.noatime`"
-		PROP_RMOUNT="`$BB cat $M2SD_CONFIGS/.rmount`"
 
 		DEV_SYSTEM=`$BB cat /proc/mounts | $BB grep "/dev/" | $BB grep " /system " | $BB cut -d " " -f 1`
 		DEV_DATA=`$BB cat /proc/mounts | $BB grep "/dev/" | $BB grep " /data " | $BB cut -d " " -f 1`
@@ -398,7 +408,7 @@ for loopwrapper in true; do
 								*)
 									if $BB [ -z "$MMC_SDEXT" ] && $BB [ "$FS_TYPE" != "vfat" ] && $BB [ ! -z "`$BB cat /proc/filesystems | $BB grep $FS_TYPE | $BB grep -v 'nodev'`" ]; then
 										MMC_SDEXT="$i"
-										[ "$PROP_EXTFS" = "auto" ] && MMC_SDEXT_FS="$FS_TYPE" || MMC_SDEXT_FS="$PROP_EXTFS"
+										$BB [ "$PROP_EXTFS" = "auto" ] && MMC_SDEXT_FS="$FS_TYPE" || MMC_SDEXT_FS="$PROP_EXTFS"
 
 									elif $BB [ -z "$MMC_SDEXT" ] && $BB [ "$FS_TYPE" != "vfat" ]; then
 										doLog w "The device $i does not contain a supported sd-ext filesystem!"
@@ -437,7 +447,7 @@ for loopwrapper in true; do
 		done
 
 		# Activate SWAP if we have any and if it is set to be activated
-		if [ ! -z "$MMC_SWAP" ]; then
+		if $BB [ ! -z "$MMC_SWAP" ]; then
 			doProp set mounts2sd.swap.device "$MMC_SWAP"
 
 			if $BB [ "$PROP_SWAP" = "enable" ]; then
@@ -457,7 +467,7 @@ for loopwrapper in true; do
 		fi
 
 		# Activate a2sd that will move content from data to sd-ext
-		if [ ! -z "$MMC_SDEXT" ]; then
+		if $BB [ ! -z "$MMC_SDEXT" ]; then
 			MMC_DEVNUM="`$BB ls -l $MMC_SDEXT | $BB tr -s " " | sed -ne "s/^.*[ ]\([0-9]\+\),[ ]\([0-9]\+\)[ ].*$/\1:\2/p"`"
 			MMC_DEVNAME="`basename $MMC_SDEXT`"
 
@@ -511,7 +521,7 @@ for loopwrapper in true; do
 					$BB [ -z "$OPTIONS" ] && OPTIONS="noatime,nodiratime" || OPTIONS="$OPTIONS,noatime,nodiratime"
 				fi
 
-				if [ "$PROP_RMOUNT" = "enable" ]; then
+				if $BB [ "$PROP_RMOUNT" = "enable" ]; then
 					doLog v "Moving internal nand mount point from /data to $SDEXT_PATH..."
 					$BB mount --move /data $SDEXT_PATH
 
@@ -525,10 +535,10 @@ for loopwrapper in true; do
 					fi
 				fi
 
-				if [ "$PROP_RMOUNT" != "enable" ] || $BB [ "`doProp get mounts2sd.rmount.status`" = "loaded" ]; then
-					$BB [ ! -z "$OPTIONS" ] && $BB mount -o $OPTIONS -t $PROP_EXTFS $MMC_SDEXT $SDEXT_PATH || mount -t $PROP_EXTFS $MMC_SDEXT $SDEXT_PATH
+				if $BB [ "$PROP_RMOUNT" != "enable" ] || $BB [ "`doProp get mounts2sd.rmount.status`" = "loaded" ]; then
+					$BB [ ! -z "$OPTIONS" ] && $BB mount -o $OPTIONS -t $PROP_EXTFS $MMC_SDEXT $SDEXT_PATH || $BB mount -t $PROP_EXTFS $MMC_SDEXT $SDEXT_PATH
 
-					if [ "$?" != "0" ] && [ "$PROP_EXTFS" != "auto" ]; then
+					if $BB [ -z "`$BB cat /proc/mounts | $BB grep -w $MMC_SDEXT`" ] && $BB [ "$PROP_EXTFS" != "auto" ]; then
 						doLog w "Could not mount sd-ext as $PROP_EXTFS. Trying again with auto detection and no additional options!"
 						$BB [ ! -z "$OPTIONS" ] && $BB mount -t auto $MMC_SDEXT $SDEXT_PATH
 					fi
@@ -556,7 +566,7 @@ for loopwrapper in true; do
 								$BB chmod 771 /data/$x
 							fi
 
-							if $BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ] && $BB [ ! -z "`$BB find -type f /sd-ext/$x`" ]; then
+							if $BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ] && $BB [ ! -z "`$BB find /sd-ext/$x -type f`" ]; then
 								doLog v "Reverting /sd-ext/$x back to /data/$x..."
 
 								if $BB [ "$x" != "dalvik-cache" ]; then
@@ -581,11 +591,11 @@ for loopwrapper in true; do
 									$BB rm -rf /sd-ext/$x
 								fi
 
-							elif [ -e /sd-ext/$x ]; then
-								DIRS="`$BB find -type d /sd-ext/$x`"
+							elif $BB [ -e /sd-ext/$x ]; then
+								$BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && DIRS="`$BB find /sd-ext/$x -type d`"
 
 								# Handle cases where init.rc creates muti-level folder structure but all are empty
-								if [ ! -z "$DIRS" ]; then
+								if $BB [ ! -z "$DIRS" ]; then
 									for n in $DIRS; do
 										c="`$BB echo $n | $BB sed 's/^\/sd\-ext\//\/data\//'`"
 
@@ -609,7 +619,7 @@ for loopwrapper in true; do
 								$BB chmod 771 /sd-ext/$x
 							fi
 
-							if $BB [ -d /data/$x ] && $BB [ ! -L /data/$x ] && $BB [ ! -z "`$BB ls -v /data/$x`" ] && $BB [ ! -z "`$BB find -type f /data/$x`" ]; then
+							if $BB [ -d /data/$x ] && $BB [ ! -L /data/$x ] && $BB [ ! -z "`$BB ls -v /data/$x`" ] && $BB [ ! -z "`$BB find /data/$x -type f`" ]; then
 								doLog v "Moving content from /data/$x to /sd-ext/$x..."
 
 								if $BB [ "$x" != "dalvik-cache" ]; then
@@ -639,10 +649,10 @@ for loopwrapper in true; do
 								$BB chmod 771 /data/$x
 
 							else
-								DIRS="`$BB find -type d /data/$x`"
+								DIRS="`$BB find /data/$x -type d`"
 
 								# Handle cases where init.rc creates muti-level folder structure but all are empty
-								if [ ! -z "$DIRS" ]; then
+								if $BB [ ! -z "$DIRS" ]; then
 									for n in $DIRS; do
 										c="`$BB echo $n | $BB sed 's/^\/data\//\/sd\-ext\//'`"
 
@@ -705,7 +715,7 @@ for loopwrapper in true; do
 				fi
 			fi
 
-		elif [ ! -z "$MMC_DEVICE" ]; then
+		elif $BB [ ! -z "$MMC_DEVICE" ]; then
 			doLog w "Could not find any sd-ext partitions on the sdcard!"
 		fi
 
@@ -831,7 +841,7 @@ for loopwrapper in true; do
 		$BB echo "" >> $M2SD_CONFIGS/m2sd.log
 		$BB echo "Registered properties:" >> $M2SD_CONFIGS/m2sd.log
 		$BB echo "----------------------" >> $M2SD_CONFIGS/m2sd.log
-		doProp get | grep mounts2sd >> $M2SD_CONFIGS/m2sd.log
+		doProp get | $BB grep mounts2sd >> $M2SD_CONFIGS/m2sd.log
 		$BB echo "" >> $M2SD_CONFIGS/m2sd.log
 		$BB echo "Mount Points:" >> $M2SD_CONFIGS/m2sd.log
 		$BB echo "-------------" >> $M2SD_CONFIGS/m2sd.log
@@ -843,8 +853,8 @@ for loopwrapper in true; do
 		if $BB [ -e /sys/class/leds/green/brightness ]; then
 			$BB echo 0 > /sys/class/leds/green/brightness
 
-		elif [ -e /sys/class/leds/button-backlight/brightness ]; then
-			echo 0 > /sys/class/leds/button-backlight/brightness
+		elif $BB [ -e /sys/class/leds/button-backlight/brightness ]; then
+			$BB echo 0 > /sys/class/leds/button-backlight/brightness
 		fi
 
 		# Kill all active processes 
