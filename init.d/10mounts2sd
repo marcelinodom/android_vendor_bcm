@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-M2SD_VERSION="3.0.4"
+M2SD_VERSION="3.0.6"
 M2SD_PROPERTIES="debug:disable:boolean rmount:disable:boolean noatime:disable:boolean dlcache:disable:boolean extfs:auto:fstype apps:enable:boolean data:disable:boolean cmdalvik:disable:boolean dalvik:disable:boolean cache:auto:option swap:disable:boolean readahead:512:integer journal:auto:option fschk:enable:boolean"
 M2SD_CONFIGS=/system/etc/m2sd
 BB=/system/xbin/busybox.m2sd
@@ -384,12 +384,12 @@ for loopwrapper in true; do
 		# Locate the sdcard along with it's partitions
 		for MMC_TRIES in `seq 1 8`; do
 			for MMC_NUM in `seq 0 9`; do
-				if $BB [ "`$BB cat /sys/block/mmcblk$MMC_NUM/device/type`" = "SD" ]; then
+				if $BB [ -e /sys/block/mmcblk$MMC_NUM/device/type ] && $BB [ "`$BB cat /sys/block/mmcblk$MMC_NUM/device/type`" = "SD" ]; then
 					doLog v "sdcard found at /sys/block/mmcblk$MMC_NUM..."
 
 					MMC_DEVICE=/dev/block/mmcblk${MMC_NUM}
-					MMC_PARTITIONS="`$BB fdisk -l $MMC_DEVICE | awk '/^\// {print $1}'`"
-					MMC_MM="`$BB ls -l $MMC_DEVICE | $BB tr -s " " | sed -ne "s/^.*[ ]\([0-9]\+\),[ ]\([0-9]\+\)[ ].*$/\1:\2/p"`"
+					MMC_PARTITIONS="`$BB fdisk -l $MMC_DEVICE | $BB awk '/^\// {print $1}'`"
+					MMC_MM="`$BB ls -l $MMC_DEVICE | $BB tr -s " " | $BB sed -ne "s/^.*[ ]\([0-9]\+\),[ ]\([0-9]\+\)[ ].*$/\1:\2/p"`"
 
 					if $BB [ -e /sys/devices/virtual/bdi/$MMC_MM/read_ahead_kb ]; then
 						doLog v "Setting sdcard readahead to ${PROP_READAHEAD}kb..."
