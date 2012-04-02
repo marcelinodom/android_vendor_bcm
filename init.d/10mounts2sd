@@ -306,13 +306,23 @@ for loopwrapper in true; do
 	# INITIATION PART
 	# =========================================================================================
 	else
-		if $BB [ -e $M2SD_CONFIGS/m2sd.switch ] && $BB [ "`$BB cat $M2SD_CONFIGS/m2sd.switch`" = "0" ]; then
-			doLog v "M2SD has been disabled!"; break
-		fi
-
 		# Remount partitions with write permissions
 		$BB mount -o remount,rw /
 		$BB mount -o remount,rw /system
+
+		$BB chown 1000.1000 $M2SD_CONFIGS
+		$BB chmod 0771 $M2SD_CONFIGS
+		$BB chown 1000.1000 $M2SD_CONFIGS/m2sd.*
+		$BB chmod 0700 $M2SD_CONFIGS/m2sd.*
+
+		if $BB [ -e $M2SD_CONFIGS/m2sd.switch ] && $BB [ "`$BB cat $M2SD_CONFIGS/m2sd.switch`" = "0" ]; then
+			doLog v "M2SD has been disabled!"
+
+			$BB mount -o remount,ro /
+			$BB mount -o remount,ro /system
+
+			break
+		fi
 
 		if $BB [ -e /sys/class/leds/green/brightness ]; then
 			$BB echo 1 > /sys/class/leds/green/brightness
@@ -342,6 +352,8 @@ for loopwrapper in true; do
 
 			if $BB [ ! -e $M2SD_CONFIGS/$I_INDEX ] || $BB [ -z "`$BB cat $M2SD_CONFIGS/$I_INDEX`" ]; then
 				$BB echo "`$BB echo $i | $BB cut -d ":" -f 3`" > $M2SD_CONFIGS/$I_INDEX
+				$BB chown 1000.1000 $M2SD_CONFIGS/$I_INDEX
+				$BB chmod 0700 $M2SD_CONFIGS/$I_INDEX
 			fi
 		done
 
