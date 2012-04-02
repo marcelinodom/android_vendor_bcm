@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-M2SD_VERSION="3.1.0"
+M2SD_VERSION="4.0.0"
 M2SD_PROPERTIES="debug:m2sd.debug:0:boolean rmount:m2sd.rmount.switch:0:boolean noatime:m2sd.noatime.switch:0:boolean dlcache:m2sd.cache.download.switch:0:boolean extfs:m2sd.extfs.value:auto:fstype apps:m2sd.apps.switch:1:boolean data:m2sd.data.switch:0:boolean cmdalvik:m2sd.dalvik.cm.switch:0:boolean dalvik:m2sd.dalvik.switch:0:boolean cache:m2sd.cache.switch:-1:option swap:m2sd.swap.switch:0:boolean readahead:m2sd.readahead.value:512:integer journal:m2sd.journal.switch:-1:option fschk:m2sd.fschk.switch:1:boolean"
 M2SD_CONFIGS=/data/property
 BB=/system/xbin/busybox.m2sd
