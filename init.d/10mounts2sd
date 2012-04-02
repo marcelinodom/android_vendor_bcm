@@ -1,8 +1,8 @@
 #!/system/bin/sh
 
-M2SD_VERSION="3.0.6"
-M2SD_PROPERTIES="debug:disable:boolean rmount:disable:boolean noatime:disable:boolean dlcache:disable:boolean extfs:auto:fstype apps:enable:boolean data:disable:boolean cmdalvik:disable:boolean dalvik:disable:boolean cache:auto:option swap:disable:boolean readahead:512:integer journal:auto:option fschk:enable:boolean"
-M2SD_CONFIGS=/system/etc/m2sd
+M2SD_VERSION="3.1.0"
+M2SD_PROPERTIES="debug:m2sd.debug:0:boolean rmount:m2sd.rmount.switch:0:boolean noatime:m2sd.noatime.switch:0:boolean dlcache:m2sd.cache.download.switch:0:boolean extfs:m2sd.extfs.value:auto:fstype apps:m2sd.apps.switch:1:boolean data:m2sd.data.switch:0:boolean cmdalvik:m2sd.dalvik.cm.switch:0:boolean dalvik:m2sd.dalvik.switch:0:boolean cache:m2sd.cache.switch:-1:option swap:m2sd.swap.switch:0:boolean readahead:m2sd.readahead.value:512:integer journal:m2sd.journal.switch:-1:option fschk:m2sd.fschk.switch:1:boolean"
+M2SD_CONFIGS=/data/property
 BB=/system/xbin/busybox.m2sd
 TOOLBOX=/system/bin/toolbox
 SDEXT_PATH="/sd-ext"
@@ -21,10 +21,10 @@ doLog() {
 	if $BB [ -z "$TMP_LABE" ]; then
 		export TMP_LABE="TRUE"
 
-		$BB echo "" > $M2SD_CONFIGS/m2sd.log
+		$BB echo "" > /system/etc/m2sd.log
 	fi
 
-	$BB echo "$LOG_LEVEL/$LOG_MSG" >> $M2SD_CONFIGS/m2sd.log
+	$BB echo "$LOG_LEVEL/$LOG_MSG" >> /system/etc/m2sd.log
 }
 
 doProp() {
@@ -165,8 +165,8 @@ for loopwrapper in true; do
 				;;
 
 				"log")
-					if $BB [ -f $M2SD_CONFIGS/m2sd.log ] && $BB [ ! -z "`$BB cat $M2SD_CONFIGS/m2sd.log`" ]; then
-						$BB cat $M2SD_CONFIGS/m2sd.log
+					if $BB [ -f /system/etc/m2sd.log ] && $BB [ ! -z "`$BB cat /system/etc/m2sd.log`" ]; then
+						$BB cat /system/etc/m2sd.log
 
 					else
 						$BB echo " - Log file is empty!"
@@ -201,23 +201,27 @@ for loopwrapper in true; do
 
 				"fixperm") 
 					doWrite start
-					$BB echo "1" > $M2SD_CONFIGS/.fix_permissions
+					$BB echo "1" > $M2SD_CONFIGS/m2sd.fix.permissions.boot
 					doWrite stop
 					$BB echo "A permissions check will be performed during the next boot!"
 				;;
 
 				*)
-					CMD_LINE="`$BB echo $M2SD_PROPERTIES | $BB sed -n "s/.*\($INAME:[a-z0-9]*:[a-z0-9]*\).*/\1/p"`"
+					CMD_LINE="`$BB echo $M2SD_PROPERTIES | $BB sed -n "s/.*\($INAME:[^:]*:[^:]*:[a-z]*\).*/\1/p"`"
 
 					if $BB [ ! -z "$CMD_LINE" ]; then
-						CMD_VALUE="`$BB echo $CMD_LINE | $BB cut -d ":" -f 2`"
-						CMD_TYPE="`$BB echo $CMD_LINE | $BB cut -d ":" -f 3`"
+						CMD_FILE="`$BB echo $CMD_LINE | $BB cut -d ":" -f 2`"
+						CMD_VALUE="`$BB echo $CMD_LINE | $BB cut -d ":" -f 3`"
+						CMD_TYPE="`$BB echo $CMD_LINE | $BB cut -d ":" -f 4`"
 
 						if $BB [ ! -z "$IVALUE" ]; then
+							IVALUENAME="$IVALUE"
+
 							case "$CMD_TYPE" in
 								"boolean") 
 									if $BB [ "$IVALUE" = "enable" ] || $BB [ "$IVALUE" = "disable" ]; then
 										CHK_EXCEPT="true"
+										$BB [ "$IVALUE" = "enable" ] && IVALUE="1" || IVALUE="0"
 
 									else
 										$BB echo "Invalid value. The command '$INAME' only excepts the values 'enable' or 'disable'!"
@@ -227,6 +231,12 @@ for loopwrapper in true; do
 								"option") 
 									if $BB [ "$IVALUE" = "enable" ] || $BB [ "$IVALUE" = "disable" ] || $BB [ "$IVALUE" = "auto" ]; then
 										CHK_EXCEPT="true"
+
+										if $BB [ "$IVALUE" = "auto" ]; then
+											IVALUE="-1"
+										else
+											$BB [ "$IVALUE" = "enable" ] && IVALUE="1" || IVALUE="0"
+										fi
 
 									else
 										$BB echo "Invalid value. The command '$INAME' only excepts the values 'enable', 'disable' or 'auto'!"
@@ -256,20 +266,32 @@ for loopwrapper in true; do
 
 							if $BB [ "$CHK_EXCEPT" = "true" ]; then
 								doWrite start
-								$BB echo "$IVALUE" > $M2SD_CONFIGS/.$INAME
+								$BB echo "$IVALUE" > $M2SD_CONFIGS/$CMD_FILE
 								doWrite stop
-								$BB echo " - Changed M2SD $INAME to $IVALUE. Reboot to make changes take affect!"
+								$BB echo " - Changed M2SD $INAME to $IVALUENAME. Reboot to make changes take affect!"
 							fi
 
 						else
-							if $BB [ -f $M2SD_CONFIGS/.$INAME ]; then
-								$BB echo "`$BB cat $M2SD_CONFIGS/.$INAME`"
+							if $BB [ ! -f $M2SD_CONFIGS/$CMD_FILE ]; then
+								doWrite start
+								$BB echo "$CMD_VALUE" > $M2SD_CONFIGS/$CMD_FILE
+								$BB chown 1000.1000 $M2SD_CONFIGS/$CMD_FILE
+								$BB chmod 0600 $M2SD_CONFIGS/$CMD_FILE
+								doWrite stop
+							fi
+
+							if $BB [ "$CMD_TYPE" != "boolean" ] && $BB [ "$CMD_TYPE" != "option" ]; then
+								$BB echo "`$BB cat $M2SD_CONFIGS/$CMD_FILE`"
 
 							else
-								doWrite start
-								$BB echo "$CMD_VALUE" > $M2SD_CONFIGS/.$INAME
-								doWrite stop
-								$BB echo "$CMD_VALUE"
+								IVALUE="`$BB cat $M2SD_CONFIGS/$CMD_FILE`"
+
+								if $BB [ "$CMD_TYPE" = "option" ] && $BB [ "$IVALUE" = "-1" ]; then
+									echo "auto"
+
+								else
+									$BB [ "$IVALUE" = "1" ] && echo "enable" || echo "disable"
+								fi
 							fi
 						fi
 
@@ -284,6 +306,10 @@ for loopwrapper in true; do
 	# INITIATION PART
 	# =========================================================================================
 	else
+		if $BB [ -e $M2SD_CONFIGS/m2sd.switch ] && $BB [ "`$BB cat $M2SD_CONFIGS/m2sd.switch`" = "0" ]; then
+			doLog v "M2SD has been disabled!"; break
+		fi
+
 		# Remount partitions with write permissions
 		$BB mount -o remount,rw /
 		$BB mount -o remount,rw /system
@@ -296,8 +322,8 @@ for loopwrapper in true; do
 		fi
 
 		# Activate debug if selected
-		if $BB [ -e $M2SD_CONFIGS/.debug ] && $BB [ "`$BB cat $M2SD_CONFIGS/.debug`" = "enable" ]; then
-			logcat > $M2SD_CONFIGS/debug.logcat &
+		if $BB [ -e $M2SD_CONFIGS/m2sd.debug ] && $BB [ "`$BB cat $M2SD_CONFIGS/m2sd.debug`" = "1" ]; then
+			logcat > /system/etc/m2sd.debug &
 			LOGCAT_PID="$!"
 		fi
 
@@ -312,10 +338,10 @@ for loopwrapper in true; do
 
 		# Create the default settings if they do not exist 
 		for i in $M2SD_PROPERTIES; do
-			I_INDEX="`$BB echo $i | $BB cut -d ":" -f 1`"
+			I_INDEX="`$BB echo $i | $BB cut -d ":" -f 2`"
 
-			if $BB [ ! -e $M2SD_CONFIGS/.$I_INDEX ] || $BB [ -z "`$BB cat $M2SD_CONFIGS/.$I_INDEX`" ]; then
-				$BB echo "`$BB echo $i | $BB cut -d ":" -f 2`" > $M2SD_CONFIGS/.$I_INDEX
+			if $BB [ ! -e $M2SD_CONFIGS/$I_INDEX ] || $BB [ -z "`$BB cat $M2SD_CONFIGS/$I_INDEX`" ]; then
+				$BB echo "`$BB echo $i | $BB cut -d ":" -f 3`" > $M2SD_CONFIGS/$I_INDEX
 			fi
 		done
 
@@ -328,29 +354,29 @@ for loopwrapper in true; do
 			# Also CM has added system dex's to be placed in /cache/dalvik-cache rather than /data/dalvik-cache, so moving /cache to /data or /sd-ext
 			# will also create dalvik problems. Instead we turn off data, dalvik and only move /cache/download.
 
-			PROP_DLCACHE="enable"
-			PROP_DALVIK="disable"
-			PROP_CMDALVIK="disable"
-			PROP_DATA="disable"
-			PROP_RMOUNT="disable"
+			PROP_DLCACHE="1"
+			PROP_DALVIK="0"
+			PROP_CMDALVIK="0"
+			PROP_DATA="0"
+			PROP_RMOUNT="0"
 			M2SD_STATUS="safe-mode"
 		else
-			PROP_DLCACHE="`$BB cat $M2SD_CONFIGS/.dlcache`"
-			PROP_DALVIK="`$BB cat $M2SD_CONFIGS/.dalvik`" 
-			PROP_CMDALVIK="`$BB cat $M2SD_CONFIGS/.cmdalvik`"
-			PROP_DATA="`$BB cat $M2SD_CONFIGS/.data`"
-			PROP_RMOUNT="`$BB cat $M2SD_CONFIGS/.rmount`"
+			PROP_DLCACHE="`$BB cat $M2SD_CONFIGS/m2sd.cache.download.switch`"
+			PROP_DALVIK="`$BB cat $M2SD_CONFIGS/m2sd.dalvik.switch`" 
+			PROP_CMDALVIK="`$BB cat $M2SD_CONFIGS/m2sd.dalvik.cm.switch`"
+			PROP_DATA="`$BB cat $M2SD_CONFIGS/m2sd.data.switch`"
+			PROP_RMOUNT="`$BB cat $M2SD_CONFIGS/m2sd.rmount.switch`"
 			M2SD_STATUS="loaded"
 		fi
 
-		PROP_CACHE="`$BB cat $M2SD_CONFIGS/.cache`"
-		PROP_EXTFS="`$BB cat $M2SD_CONFIGS/.extfs`" 
-		PROP_APPS="`$BB cat $M2SD_CONFIGS/.apps`"
-		PROP_SWAP="`$BB cat $M2SD_CONFIGS/.swap`" 
-		PROP_READAHEAD="`$BB cat $M2SD_CONFIGS/.readahead`"
-		PROP_JOURNAL="`$BB cat $M2SD_CONFIGS/.journal`" 
-		PROP_FSCHK="`$BB cat $M2SD_CONFIGS/.fschk`"
-		PROP_NOATIME="`$BB cat $M2SD_CONFIGS/.noatime`"
+		PROP_CACHE="`$BB cat $M2SD_CONFIGS/m2sd.cache.switch`"
+		PROP_EXTFS="`$BB cat $M2SD_CONFIGS/m2sd.extfs.value`" 
+		PROP_APPS="`$BB cat $M2SD_CONFIGS/m2sd.apps.switch`"
+		PROP_SWAP="`$BB cat $M2SD_CONFIGS/m2sd.swap.switch`" 
+		PROP_READAHEAD="`$BB cat $M2SD_CONFIGS/m2sd.readahead.value`"
+		PROP_JOURNAL="`$BB cat $M2SD_CONFIGS/m2sd.journal.switch`" 
+		PROP_FSCHK="`$BB cat $M2SD_CONFIGS/m2sd.fschk.switch`"
+		PROP_NOATIME="`$BB cat $M2SD_CONFIGS/m2sd.noatime.switch`"
 
 		DEV_SYSTEM=`$BB cat /proc/mounts | $BB grep "/dev/" | $BB grep " /system " | $BB cut -d " " -f 1`
 		DEV_DATA=`$BB cat /proc/mounts | $BB grep "/dev/" | $BB grep " /data " | $BB cut -d " " -f 1`
@@ -371,7 +397,7 @@ for loopwrapper in true; do
 				doLog v "Disabling /system atime & diratime..."
 				$BB mount -o remount,noatime,nodiratime,barrier=0,nobh /system
 
-			elif $BB [ "$PROP_NOATIME" = "enable" ]; then
+			elif $BB [ "$PROP_NOATIME" = "1" ]; then
 				doLog v "Disabling /data atime & diratime..."
 				$BB mount -o remount,noatime,nodiratime /data
 			fi
@@ -450,7 +476,7 @@ for loopwrapper in true; do
 		if $BB [ ! -z "$MMC_SWAP" ]; then
 			doProp set mounts2sd.swap.device "$MMC_SWAP"
 
-			if $BB [ "$PROP_SWAP" = "enable" ]; then
+			if $BB [ "$PROP_SWAP" = "1" ]; then
 				$BB swapon $MMC_SWAP
 
 				if $BB [ "$?" = "0" ]; then
@@ -462,7 +488,7 @@ for loopwrapper in true; do
 				fi
 			fi
 
-		elif $BB [ "$PROP_SWAP" = "enable" ]; then
+		elif $BB [ "$PROP_SWAP" = "1" ]; then
 			doLog v "Did not find any SWAP partition. Skipping..."
 		fi
 
@@ -482,7 +508,7 @@ for loopwrapper in true; do
 					MMC_SDEXT_FS="auto"
 				fi
 
-				if $BB [ "$PROP_FSCHK" = "enable" ]; then
+				if $BB [ "$PROP_FSCHK" = "1" ]; then
 					$BB [ ! -z "`$BB which e2fsck`" ] && CMD_FSCK="`$BB which e2fsck`" || CMD_FSCK="$BB e2fsck"
 
 					doLog v "Running e2fsck on sd-ext..."
@@ -498,11 +524,11 @@ for loopwrapper in true; do
 					fi
 				fi
 
-				if $BB [ "$PROP_JOURNAL" != "auto" ]; then
+				if $BB [ "$PROP_JOURNAL" != "-1" ]; then
 					if $BB [ "$MMC_SDEXT_FS" = "ext4" ]; then
 						$BB [ ! -z "`$BB which tune2fs`" ] && CMD_TUNE2FS="`$BB which tune2fs`" || CMD_TUNE2FS="$BB tune2fs"
 
-						if $BB [ "$PROP_JOURNAL" = "disable" ]; then
+						if $BB [ "$PROP_JOURNAL" = "0" ]; then
 							doLog v "Disabling journal on sd-ext..."
 							$CMD_TUNE2FS -O ^has_journal $MMC_SDEXT
 
@@ -517,11 +543,11 @@ for loopwrapper in true; do
 					fi
 				fi
 
-				if $BB [ "$PROP_NOATIME" = "enable" ]; then
+				if $BB [ "$PROP_NOATIME" = "1" ]; then
 					$BB [ -z "$OPTIONS" ] && OPTIONS="noatime,nodiratime" || OPTIONS="$OPTIONS,noatime,nodiratime"
 				fi
 
-				if $BB [ "$PROP_RMOUNT" = "enable" ]; then
+				if $BB [ "$PROP_RMOUNT" = "1" ]; then
 					doLog v "Moving internal nand mount point from /data to $SDEXT_PATH..."
 					$BB mount --move /data $SDEXT_PATH
 
@@ -535,7 +561,7 @@ for loopwrapper in true; do
 					fi
 				fi
 
-				if $BB [ "$PROP_RMOUNT" != "enable" ] || $BB [ "`doProp get mounts2sd.rmount.status`" = "loaded" ]; then
+				if $BB [ "$PROP_RMOUNT" != "1" ] || $BB [ "`doProp get mounts2sd.rmount.status`" = "loaded" ]; then
 					$BB [ ! -z "$OPTIONS" ] && $BB mount -o $OPTIONS -t $PROP_EXTFS $MMC_SDEXT $SDEXT_PATH || $BB mount -t $PROP_EXTFS $MMC_SDEXT $SDEXT_PATH
 
 					if $BB [ -z "`$BB cat /proc/mounts | $BB grep -w $MMC_SDEXT`" ] && $BB [ "$PROP_EXTFS" != "auto" ]; then
@@ -549,12 +575,15 @@ for loopwrapper in true; do
 						$BB chown 1000.1000 $SDEXT_PATH
 						$BB chmod 771 $SDEXT_PATH
 
-						DO_REVERT="local misc property system tombstones"
+						DO_REVERT="local misc system tombstones"
 						DO_MOVE=""
 
-						$BB [ "$PROP_DALVIK" = "enable" ] && DO_MOVE="$DO_MOVE dalvik-cache" || DO_REVERT="$DO_REVERT dalvik-cache"
-						$BB [ "$PROP_DATA" = "enable" ] && DO_MOVE="$DO_MOVE data" || DO_REVERT="$DO_REVERT data"
-						$BB [ "$PROP_APPS" = "enable" ] && DO_MOVE="$DO_MOVE app app-private app-system" || DO_REVERT="$DO_REVERT app app-private app-system"
+						# Make sure that property always stays on the internal nand
+						$BB [ "$PROP_RMOUNT" = "1" ] && DO_MOVE="$DO_MOVE property" || DO_REVERT="$DO_REVERT property"
+
+						$BB [ "$PROP_DALVIK" = "1" ] && DO_MOVE="$DO_MOVE dalvik-cache" || DO_REVERT="$DO_REVERT dalvik-cache"
+						$BB [ "$PROP_DATA" = "1" ] && DO_MOVE="$DO_MOVE data" || DO_REVERT="$DO_REVERT data"
+						$BB [ "$PROP_APPS" = "1" ] && DO_MOVE="$DO_MOVE app app-private app-system" || DO_REVERT="$DO_REVERT app app-private app-system"
 
 						# Revert content from sd-ext
 						for x in $DO_REVERT; do
@@ -739,17 +768,17 @@ for loopwrapper in true; do
 			done
 		fi
 
-		if $BB [ ! -f $M2SD_CONFIGS/.fix_permissions ] || $BB [ "`$BB cat $M2SD_CONFIGS/.fix_permissions`" = "1" ]; then
+		if $BB [ ! -f $M2SD_CONFIGS/m2sd.fix.permissions.boot ] || $BB [ "`$BB cat $M2SD_CONFIGS/m2sd.fix.permissions.boot`" = "1" ]; then
 			doLog v "Performing a one time permissions check..."
-			$BB echo "0" > $M2SD_CONFIGS/.fix_permissions
+			$BB echo "0" > $M2SD_CONFIGS/m2sd.fix.permissions.boot
 			fix_permissions -l -r
 		fi
 
 		# Handle /cache
-		if $BB [ "$PROP_CACHE" = "enable" ] || ( $BB [ "$PROP_CACHE" = "auto" ] && $BB [ "`$BB df -m /cache | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f2`" -lt 40 ] ); then
+		if $BB [ "$PROP_CACHE" = "1" ] || ( $BB [ "$PROP_CACHE" = "-1" ] && $BB [ "`$BB df -m /cache | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f2`" -lt 40 ] ); then
 			doProp set mounts2sd.cache.device "tmpfs"
 
-			$BB [ "$PROP_DLCACHE" = "enable" ] && CACHE_LOCATION="/cache/download" || CACHE_LOCATION="/cache"
+			$BB [ "$PROP_DLCACHE" = "1" ] && CACHE_LOCATION="/cache/download" || CACHE_LOCATION="/cache"
 
 			if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " $CACHE_LOCATION "`" ]; then
 				doLog v "Umounting pre-mounted $CACHE_LOCATION..."
@@ -782,7 +811,7 @@ for loopwrapper in true; do
 			fi
 		fi
 
-		if $BB [ "$PROP_CACHE" = "enable" ] || ( $BB [ "$PROP_CACHE" = "auto" ] && $BB [ "`$BB df -m /data | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f4`" -lt 40 ] ); then
+		if $BB [ "$PROP_CACHE" = "1" ] || ( $BB [ "$PROP_CACHE" = "-1" ] && $BB [ "`$BB df -m /data | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f4`" -lt 40 ] ); then
 			for i in /cache/data-tmp /data/local/tmp; do
 				if $BB [ ! -d $i ]; then
 					$BB mkdir $i
@@ -799,7 +828,7 @@ for loopwrapper in true; do
 			fi
 		fi
 
-		if $BB [ "$PROP_CMDALVIK" = "enable" ]; then
+		if $BB [ "$PROP_CMDALVIK" = "1" ]; then
 			if $BB [ ! -d /cache/dalvik-cache ]; then
 				$BB mkdir /cache/dalvik-cache
 
@@ -838,15 +867,15 @@ for loopwrapper in true; do
 
 		doLog v "Mounts2SD has been loaded!"
 
-		$BB echo "" >> $M2SD_CONFIGS/m2sd.log
-		$BB echo "Registered properties:" >> $M2SD_CONFIGS/m2sd.log
-		$BB echo "----------------------" >> $M2SD_CONFIGS/m2sd.log
-		doProp get | $BB grep mounts2sd >> $M2SD_CONFIGS/m2sd.log
-		$BB echo "" >> $M2SD_CONFIGS/m2sd.log
-		$BB echo "Mount Points:" >> $M2SD_CONFIGS/m2sd.log
-		$BB echo "-------------" >> $M2SD_CONFIGS/m2sd.log
-		$BB df -h | $BB grep $MMC_DEVICE >> $M2SD_CONFIGS/m2sd.log
-		$BB echo "" >> $M2SD_CONFIGS/m2sd.log
+		$BB echo "" >> /system/etc/m2sd.log
+		$BB echo "Registered properties:" >> /system/etc/m2sd.log
+		$BB echo "----------------------" >> /system/etc/m2sd.log
+		doProp get | $BB grep mounts2sd >> /system/etc/m2sd.log
+		$BB echo "" >> /system/etc/m2sd.log
+		$BB echo "Mount Points:" >> /system/etc/m2sd.log
+		$BB echo "-------------" >> /system/etc/m2sd.log
+		$BB df -h | $BB grep $MMC_DEVICE >> /system/etc/m2sd.log
+		$BB echo "" >> /system/etc/m2sd.log
 
 		doProp set mounts2sd.status "$M2SD_STATUS"
 
@@ -856,6 +885,10 @@ for loopwrapper in true; do
 		elif $BB [ -e /sys/class/leds/button-backlight/brightness ]; then
 			$BB echo 0 > /sys/class/leds/button-backlight/brightness
 		fi
+
+		# Remount partitions with read permissions
+		$BB mount -o remount,ro /
+		$BB mount -o remount,ro /system
 
 		# Kill all active processes 
 		$BB [ ! -z "$LOGCAT_PID" ] && $BB kill $LOGCAT_PID 2> /dev/null
