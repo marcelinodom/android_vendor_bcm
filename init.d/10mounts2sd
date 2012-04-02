@@ -544,6 +544,7 @@ for loopwrapper in true; do
 				fi
 
 				if $BB [ "$PROP_NOATIME" = "1" ]; then
+					doLog v "Disabling sd-ext atime & diratime..."
 					$BB [ -z "$OPTIONS" ] && OPTIONS="noatime,nodiratime" || OPTIONS="$OPTIONS,noatime,nodiratime"
 				fi
 
