@@ -105,6 +105,7 @@ for loopwrapper in true; do
 	esac
 
 	CALL_BASENAME="`$BB basename $0`"
+	SCRIPT=`$BB readlink -f $0`
 
 	if $BB [ ! -d $M2SD_CONFIGS ]; then
 		doWrite start
@@ -506,14 +507,29 @@ for loopwrapper in true; do
 
 		# Activate a2sd that will move content from data to sd-ext
 		if $BB [ ! -z "$MMC_SDEXT" ]; then
+			doProp set mounts2sd.sdext.device "$MMC_SDEXT"
+
 			MMC_DEVNUM="`$BB ls -l $MMC_SDEXT | $BB tr -s " " | sed -ne "s/^.*[ ]\([0-9]\+\),[ ]\([0-9]\+\)[ ].*$/\1:\2/p"`"
 			MMC_DEVNAME="`basename $MMC_SDEXT`"
 
 			if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep $MMC_DEVNAME`" ] || $BB [ ! -z "`$BB cat /proc/mounts | $BB grep $MMC_DEVNUM`" ]; then
-				doLog w "The sd-ext partition is already mounted!"
-				
+				doLog w "Another A2SD script was detected. Will attempt to disable it..."
+
+				for i in /system/etc/init.d/*; do
+					if $BB [ "`$BB basename $i`" != "`$BB basename $SCRIPT`" ] && ( $BB [ ! -z "`$BB cat $i | $BB grep /sd-ext`" ] || $BB [ ! -z "`$BB cat $i | $BB grep /sdext`" ] ); then
+						doLog v "Disabling the script $i..."
+						$BB chmod 0666 $i
+					fi
+				done
+
+				doLog v "Unmounting the sd-ext partition in order to continue..."
+				$BB umount $MMC_SDEXT 2> /dev/null
+			fi
+
+			if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep $MMC_DEVNAME`" ] || $BB [ ! -z "`$BB cat /proc/mounts | $BB grep $MMC_DEVNUM`" ]; then
+				doLog e "Unable to unmount the sd-ext partition. Canceling the sd-ext process!"
+
 			else
-				doProp set mounts2sd.sdext.device "$MMC_SDEXT"
 
 				if $BB [ "$MMC_SDEXT_FS" != "auto" ] && $BB [ -z "`$BB cat /proc/filesystems | $BB grep $MMC_SDEXT_FS | $BB grep -v 'nodev'`" ]; then
 					doLog w "The defined force sd-ext filesystem type $MMC_SDEXT_FS is not supported. Switching to auto detect!"
@@ -525,7 +541,7 @@ for loopwrapper in true; do
 
 					doLog v "Running e2fsck on sd-ext..."
 					$CMD_FSCK -y -D $MMC_SDEXT
-			
+		
 					E2STATUS=$?
 
 					if $BB [ $E2STATUS -gt 0 ] && $BB [ $E2STATUS -lt 4 ]; then
@@ -584,7 +600,7 @@ for loopwrapper in true; do
 
 					if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep -w $MMC_SDEXT`" ]; then
 						$BB [ "$PROP_EXTFS" = "auto" ] && doLog v "The sd-ext partition was mounted successfully at $SDEXT_PATH using auto detection of the file system type!" || doLog v "The sd-ext partition was mounted successfully at $SDEXT_PATH forced as $PROP_EXTFS!"
-				
+			
 						$BB chown 1000.1000 $SDEXT_PATH
 						$BB chmod 771 $SDEXT_PATH
 
