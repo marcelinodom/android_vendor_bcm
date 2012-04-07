@@ -1,12 +1,10 @@
 #!/system/bin/sh
 
-M2SD_VERSION="4.0.0"
+M2SD_VERSION="4.2.0"
 M2SD_PROPERTIES="debug:m2sd.debug:0:boolean rmount:m2sd.rmount.switch:0:boolean noatime:m2sd.noatime.switch:0:boolean dlcache:m2sd.cache.download.switch:0:boolean extfs:m2sd.extfs.value:auto:fstype apps:m2sd.apps.switch:1:boolean data:m2sd.data.switch:0:boolean cmdalvik:m2sd.dalvik.cm.switch:0:boolean dalvik:m2sd.dalvik.switch:0:boolean cache:m2sd.cache.switch:-1:option swap:m2sd.swap.switch:0:boolean readahead:m2sd.readahead.value:512:integer journal:m2sd.journal.switch:-1:option fschk:m2sd.fschk.switch:1:boolean"
 M2SD_CONFIGS=/data/property
 BB=/system/xbin/busybox.m2sd
 TOOLBOX=/system/bin/toolbox
-SDEXT_PATH="/sd-ext"
-DATA_PATH="/data"
 SYSTEM_MOD=""
 
 # =========================================================================================
@@ -338,7 +336,7 @@ for loopwrapper in true; do
 			LOGCAT_PID="$!"
 		fi
 
-		for i in $SDEXT_PATH /props; do
+		for i in /sd-ext /props; do
 			if $BB [ ! -d $i ]; then
 				$BB mkdir $i
 			fi
@@ -576,12 +574,15 @@ for loopwrapper in true; do
 					$BB [ -z "$OPTIONS" ] && OPTIONS="noatime,nodiratime" || OPTIONS="$OPTIONS,noatime,nodiratime"
 				fi
 
-				if $BB [ "$PROP_RMOUNT" = "1" ]; then
-					doLog v "Moving internal nand mount point from /data to $SDEXT_PATH..."
-					$BB mount --move /data $SDEXT_PATH
+				DATA_PATH="/data"
+				SDEXT_PATH="/sd-ext"
 
-					if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " $SDEXT_PATH "`" ]; then
-						DATA_PATH="$SDEXT_PATH"
+				if $BB [ "$PROP_RMOUNT" = "1" ]; then
+					doLog v "Moving internal nand mount point from /data to /sd-ext..."
+					$BB mount --move /data /sd-ext
+
+					if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " /sd-ext "`" ]; then
+						DATA_PATH="/sd-ext"
 						SDEXT_PATH="/data"
 						doProp set mounts2sd.rmount.status "loaded"
 
@@ -604,136 +605,173 @@ for loopwrapper in true; do
 						$BB chown 1000.1000 $SDEXT_PATH
 						$BB chmod 771 $SDEXT_PATH
 
+						SDEXT_SIZE="`$BB df -m /sd-ext | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f4`"
+						DATA_SIZE="`$BB df -m /data | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f4`"
+
 						DO_REVERT="local misc system tombstones"
 						DO_MOVE=""
-
-						# Make sure that property always stays on the internal nand
-						$BB [ "$PROP_RMOUNT" = "1" ] && DO_MOVE="$DO_MOVE property" || DO_REVERT="$DO_REVERT property"
 
 						$BB [ "$PROP_DALVIK" = "1" ] && DO_MOVE="$DO_MOVE dalvik-cache" || DO_REVERT="$DO_REVERT dalvik-cache"
 						$BB [ "$PROP_DATA" = "1" ] && DO_MOVE="$DO_MOVE data" || DO_REVERT="$DO_REVERT data"
 						$BB [ "$PROP_APPS" = "1" ] && DO_MOVE="$DO_MOVE app app-private app-system" || DO_REVERT="$DO_REVERT app app-private app-system"
+							
+						if $BB [ "$PROP_RMOUNT" = "1" ]; then
+							DO_MOVE="$DO_MOVE property"
+							MOVE_ORDER="revert move"
+						else
+							DO_REVERT="$DO_REVERT property"
+							MOVE_ORDER="move revert"
+						fi
 
-						# Revert content from sd-ext
-						for x in $DO_REVERT; do
-							if $BB [ ! -d /data/$x ] || $BB [ -L /data/$x ]; then
-								$BB [ -L /data/$x ] && $BB rm -rf /data/$x
+						for action in $MOVE_ORDER; do
+							if $BB [ "$action" = "revert" ]; then
+								# Revert content from sd-ext
+								for x in $DO_REVERT; do
+									if $BB [ ! -d /data/$x ] || $BB [ -L /data/$x ]; then
+										$BB [ -L /data/$x ] && $BB rm -rf /data/$x
 
-								$BB mkdir /data/$x
-								$BB chown 1000.1000 /data/$x
-								$BB chmod 771 /data/$x
-							fi
+										$BB mkdir /data/$x
+										$BB chown 1000.1000 /data/$x
+										$BB chmod 771 /data/$x
+									fi
 
-							if $BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ] && $BB [ ! -z "`$BB find /sd-ext/$x -type f`" ]; then
-								doLog v "Reverting /sd-ext/$x back to /data/$x..."
+									if $BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ] && $BB [ ! -z "`$BB find /sd-ext/$x -type f`" ]; then
+										doLog v "Reverting /sd-ext/$x back to /data/$x..."
 
-								if $BB [ "$x" != "dalvik-cache" ]; then
-									for tmp in /sd-ext/$x/*; do
-										y="`$BB basename $tmp`"
+										if $BB [ "$DATA_SIZE" -gt "`$BB du -s -m /sd-ext/$x | $BB tail -n1 | $BB cut -d ' ' -f1`" ]; then
+											if $BB [ "$x" != "dalvik-cache" ]; then
+												for tmp in /sd-ext/$x/*; do
+													y="`$BB basename $tmp`"
 
-										if $BB [ -e /data/$x/$y ]; then
-											$BB rm -rf /data/$x/$y
+													if $BB [ -e /data/$x/$y ]; then
+														$BB rm -rf /data/$x/$y
+													fi
+
+													$BB mv -f /sd-ext/$x/$y /data/$x/
+												done
+
+												if $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ]; then
+													doLog e "Not all from /sd-ext/$x could be moved to /data/$x. Check available disk space!"
+
+												else
+													$BB rmdir /sd-ext/$x
+												fi
+
+											else
+												$BB rm -rf /sd-ext/$x
+											fi
+										else
+											doLog w "The content of /sd-ext/$x is to big for reverting. Linking from sd-ext to data instead!"
+											doLog v "Creating link between /data/$x and /sd-ext/$x..."
+
+											$BB mount --bind /sd-ext/$x /data/$x
+
+											if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " /data/$x "`" ]; then
+												$BB [ "$x" = "app" ] && doProp set mounts2sd.sdext.status.apps "loaded"
+												$BB [ "$x" = "data" ] && doProp set mounts2sd.sdext.status.data "loaded"
+												$BB [ "$x" = "dalvik-cache" ] && doProp set mounts2sd.sdext.status.dalvik "loaded"
+
+											else
+												doLog e "Error while linking /data/$x to /sd-ext/$x!"
+											fi
 										fi
 
-										$BB mv -f /sd-ext/$x/$y /data/$x/
-									done
+									elif $BB [ -e /sd-ext/$x ]; then
+										$BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && DIRS="`$BB find /sd-ext/$x -type d`"
 
-									if $BB [ ! -z "`$BB ls -v /sd-ext/$x`" ]; then
-										doLog e "Not all from /sd-ext/$x could be moved to /data/$x. Check available disk space!"
+										# Handle cases where init.rc creates muti-level folder structure but all are empty
+										if $BB [ ! -z "$DIRS" ]; then
+											for n in $DIRS; do
+												c="`$BB echo $n | $BB sed 's/^\/sd\-ext\//\/data\//'`"
+
+												if $BB [ ! -d $c ]; then
+													$BB mv -f $n $c
+												fi
+											done
+										fi
+
+										$BB rm -rf /sd-ext/$x
+									fi
+								done
+							else
+								# Move content to sd-ext
+								for x in $DO_MOVE; do
+									$LINK_FOLDER="1"
+
+									if $BB [ ! -d /sd-ext/$x ] || $BB [ -L /sd-ext/$x ]; then
+										$BB [ -L /sd-ext/$x ] && $BB rm -rf /sd-ext/$x
+
+										$BB mkdir /sd-ext/$x
+										$BB chown 1000.1000 /sd-ext/$x
+										$BB chmod 771 /sd-ext/$x
+									fi
+
+									if $BB [ -d /data/$x ] && $BB [ ! -L /data/$x ] && $BB [ ! -z "`$BB ls -v /data/$x`" ] && $BB [ ! -z "`$BB find /data/$x -type f`" ]; then
+										doLog v "Moving content from /data/$x to /sd-ext/$x..."
+
+										if $BB [ "$SDEXT_SIZE" -gt "`$BB du -s -m /data/$x | $BB tail -n1 | $BB cut -d ' ' -f1`" ]; then
+											if $BB [ "$x" != "dalvik-cache" ]; then
+												for tmp in /data/$x/*; do
+													y="`$BB basename $tmp`"
+
+													if $BB [ -e /sd-ext/$x/$y ]; then
+														$BB rm -rf /sd-ext/$x/$y
+													fi
+
+													$BB mv -f /data/$x/$y /sd-ext/$x/
+												done
+
+												if $BB [ ! -z "`$BB ls -v /data/$x`" ]; then
+													doLog e "Not all from /data/$x could be moved to /sd-ext/$x. Check available disk space!"
+												fi
+
+											else
+												$BB rm -rf /data/$x
+											fi
+										else
+											doLog w "The content of /data/$x is to big to be moved to sd-ext!"
+											$LINK_FOLDER="0"
+										fi
+
+									elif $BB [ ! -d /data/$x ] || $BB [ -L /data/$x ]; then
+										$BB [ -L /data/$x ] && $BB rm -rf /data/$x
+
+										$BB mkdir /data/$x
+										$BB chown 1000.1000 /data/$x
+										$BB chmod 771 /data/$x
 
 									else
-										$BB rmdir /sd-ext/$x
+										DIRS="`$BB find /data/$x -type d`"
+
+										# Handle cases where init.rc creates muti-level folder structure but all are empty
+										if $BB [ ! -z "$DIRS" ]; then
+											for n in $DIRS; do
+												c="`$BB echo $n | $BB sed 's/^\/data\//\/sd\-ext\//'`"
+
+												if $BB [ ! -d $c ]; then
+													$BB mv -f $n $c
+												fi
+											done
+
+											$BB rm -rf /data/$x/*
+										fi
 									fi
 
-								else
-									$BB rm -rf /sd-ext/$x
-								fi
+									if $BB [ "$LINK_FOLDER" = "1" ]; then
+										doLog v "Creating link between /data/$x and /sd-ext/$x..."
 
-							elif $BB [ -e /sd-ext/$x ]; then
-								$BB [ -d /sd-ext/$x ] && $BB [ ! -L /sd-ext/$x ] && DIRS="`$BB find /sd-ext/$x -type d`"
+										$BB mount --bind /sd-ext/$x /data/$x
 
-								# Handle cases where init.rc creates muti-level folder structure but all are empty
-								if $BB [ ! -z "$DIRS" ]; then
-									for n in $DIRS; do
-										c="`$BB echo $n | $BB sed 's/^\/sd\-ext\//\/data\//'`"
+										if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " /data/$x "`" ]; then
+											$BB [ "$x" = "app" ] && doProp set mounts2sd.sdext.status.apps "loaded"
+											$BB [ "$x" = "data" ] && doProp set mounts2sd.sdext.status.data "loaded"
+											$BB [ "$x" = "dalvik-cache" ] && doProp set mounts2sd.sdext.status.dalvik "loaded"
 
-										if $BB [ ! -d $c ]; then
-											$BB mv -f $n $c
+										else
+											doLog e "Error while linking /data/$x to /sd-ext/$x!"
 										fi
-									done
-								fi
-
-								$BB rm -rf /sd-ext/$x
-							fi
-						done
-
-						# Move content to sd-ext
-						for x in $DO_MOVE; do
-							if $BB [ ! -d /sd-ext/$x ] || $BB [ -L /sd-ext/$x ]; then
-								$BB [ -L /sd-ext/$x ] && $BB rm -rf /sd-ext/$x
-
-								$BB mkdir /sd-ext/$x
-								$BB chown 1000.1000 /sd-ext/$x
-								$BB chmod 771 /sd-ext/$x
-							fi
-
-							if $BB [ -d /data/$x ] && $BB [ ! -L /data/$x ] && $BB [ ! -z "`$BB ls -v /data/$x`" ] && $BB [ ! -z "`$BB find /data/$x -type f`" ]; then
-								doLog v "Moving content from /data/$x to /sd-ext/$x..."
-
-								if $BB [ "$x" != "dalvik-cache" ]; then
-									for tmp in /data/$x/*; do
-										y="`$BB basename $tmp`"
-
-										if $BB [ -e /sd-ext/$x/$y ]; then
-											$BB rm -rf /sd-ext/$x/$y
-										fi
-
-										$BB mv -f /data/$x/$y /sd-ext/$x/
-									done
-
-									if $BB [ ! -z "`$BB ls -v /data/$x`" ]; then
-										doLog e "Not all from /data/$x could be moved to /sd-ext/$x. Check available disk space!"
 									fi
-
-								else
-									$BB rm -rf /data/$x
-								fi
-
-							elif $BB [ ! -d /data/$x ] || $BB [ -L /data/$x ]; then
-								$BB [ -L /data/$x ] && $BB rm -rf /data/$x
-
-								$BB mkdir /data/$x
-								$BB chown 1000.1000 /data/$x
-								$BB chmod 771 /data/$x
-
-							else
-								DIRS="`$BB find /data/$x -type d`"
-
-								# Handle cases where init.rc creates muti-level folder structure but all are empty
-								if $BB [ ! -z "$DIRS" ]; then
-									for n in $DIRS; do
-										c="`$BB echo $n | $BB sed 's/^\/data\//\/sd\-ext\//'`"
-
-										if $BB [ ! -d $c ]; then
-											$BB mv -f $n $c
-										fi
-									done
-
-									$BB rm -rf /data/$x/*
-								fi
-							fi
-
-							doLog v "Creating link between /data/$x and /sd-ext/$x..."
-
-							$BB mount --bind /sd-ext/$x /data/$x
-
-							if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " /data/$x "`" ]; then
-								$BB [ "$x" = "app" ] && doProp set mounts2sd.sdext.status.apps "loaded"
-								$BB [ "$x" = "data" ] && doProp set mounts2sd.sdext.status.data "loaded"
-								$BB [ "$x" = "dalvik-cache" ] && doProp set mounts2sd.sdext.status.dalvik "loaded"
-
-							else
-								doLog e "Error while linking /data/$x to /sd-ext/$x!"
+								done
 							fi
 						done
 
@@ -762,12 +800,9 @@ for loopwrapper in true; do
 						doLog e "Error while mounting the sd-ext partition!"
 
 						if $BB [ "`doProp get mounts2sd.rmount.status`" = "loaded" ]; then
-							SDEXT_PATH="$DATA_PATH"
-							DATA_PATH="/data"
-
 							doProp remove mounts2sd.rmount.status
-							doLog v "Moving internal nand mount point back to $DATA_PATH!"
-							$BB mount --move $SDEXT_PATH /data 
+							doLog v "Moving internal nand mount point back to /data!"
+							$BB mount --move /sd-ext /data 
 						fi
 					fi
 				fi
