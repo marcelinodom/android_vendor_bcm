@@ -1,11 +1,17 @@
 #!/system/bin/sh
 
-M2SD_VERSION="4.2.0"
+# possible Properties
+#  - ro.m2sd.path.script		'Default: $0'
+#  - ro.m2sd.path.sdcard		'Default: $SEARCH_RESULT'
+#  - ro.m2sd.path.props			'Default: /data/property/'
+#  - ro.m2sd.path.logs			'Default: /system/etc'	
+
+M2SD_VERSION="4.4.0"
 M2SD_PROPERTIES="debug:m2sd.debug.switch:0:boolean rmount:m2sd.rmount.switch:0:boolean noatime:m2sd.noatime.switch:0:boolean dlcache:m2sd.cache.download.switch:0:boolean extfs:m2sd.extfs.value:auto:fstype apps:m2sd.apps.switch:1:boolean data:m2sd.data.switch:0:boolean cmdalvik:m2sd.dalvik.cm.switch:0:boolean dalvik:m2sd.dalvik.switch:0:boolean cache:m2sd.cache.switch:-1:option swap:m2sd.swap.switch:0:boolean readahead:m2sd.readahead.value:512:integer journal:m2sd.journal.switch:-1:option fschk:m2sd.fschk.switch:1:boolean"
 M2SD_CONFIGS=/data/property
 M2SD_LOGS=/system/etc
-BB=/system/xbin/busybox.m2sd
-TOOLBOX=/system/bin/toolbox
+BB="busybox"
+TOOLBOX="toolbox"
 
 # =========================================================================================
 # SET LOG FUNCTION
@@ -98,9 +104,21 @@ doCreateFolder() {
 		fi
 
 		$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "doCreateFolder: Setting permissions on $CF_PATH, mod($CF_MOD), own($CF_OWNER)..."
-		# Busybox cannot set owners based on names, only numbers. init.rc uses names
-		$TOOLBOX chown $CF_OWNER $CF_PATH
-		$TOOLBOX chmod $CF_MOD $CF_PATH
+
+		if $BB [ -z "$CH_BIN" ]; then
+			$TOOLBOX chown 2> /dev/null
+
+			# Busybox cannot always set owners based on names, so we use toolbox whenever we can.
+			# However not all toolbox versions has chmod and chown included.
+			if $BB [ "$?" = "255" ]; then
+				export CH_BIN="$BB"
+			else
+				export CH_BIN="$TOOLBOX"
+			fi
+		fi
+
+		$CH_BIN chown $CF_OWNER $CF_PATH
+		$CH_BIN chmod $CF_MOD $CF_PATH
 
 		doWrite $CF_PATH stop
 	fi
@@ -145,29 +163,20 @@ for loopwrapper in true; do
 		"1") ;;
 
 		*)
-			# Maybe we have a basic busybox available
-			busybox test 2> /dev/null
+			$TOOLBOX log -p e -t mounts2sd "Missing Busybox!"
 
-			case "$?" in
-				"1") 
-					doLog w "Missing M2SD Busybox. Using ROM buildin instead."
-					BB="busybox"
-				;;
-
-				*)
-					$TOOLBOX log -p e -t mounts2sd "Missing Busybox!"
-
-					# Break loopwrapper
-					break
-				;;
-			esac
+			# Break loopwrapper
+			break
 		;;
 	esac
 
 	CALL_NAME="`$BB basename $0`"
 	SCRIPT_PATH=`$BB readlink -f $0`
 
-	if $BB [ "$CALL_NAME" = "m2sd" ] || ( $BB [ ! -z "$1" ] && $BB [ "`$BB basename $1`" = "m2sd" ] ); then
+	$BB [ ! -z "`getprop ro.m2sd.path.props`" ] && M2SD_CONFIGS="`getprop ro.m2sd.path.props`" || M2SD_CONFIGS=/data/property
+	$BB [ ! -z "`getprop ro.m2sd.path.logs`" ] && M2SD_LOGS="`getprop ro.m2sd.path.logs`" || M2SD_LOGS=/system/etc
+
+	if $BB [ "$CALL_NAME" = "m2sd" ] || ( $BB [ ! -z "$1" ] && $BB [ "$1" = "m2sd" ] ); then
 		if $BB [ "`$BB id | $BB sed -ne "s/^uid=\([0-9]\+\)[^0-9].*$/\1/p"`" != "0" ]; then
 			$BB echo "You need to be root to access m2sd configurations. Type 'su' in console to gain superuser privileges!"
 		
@@ -484,92 +493,23 @@ for loopwrapper in true; do
 		# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 		doLog v "Waiting for sdcard to initiate..."
+		MMC_DEVICE="`getprop ro.m2sd.path.sdcard`"
 
 		for MMC_TRIES in `seq 1 8`; do
-			for MMC_NUM in `seq 0 9`; do
-				$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Checking /sys/block/mmcblk$MMC_NUM/device/type for sdcard flag..."
-
-				if $BB [ -e /sys/block/mmcblk$MMC_NUM/device/type ] && $BB [ "`$BB cat /sys/block/mmcblk$MMC_NUM/device/type`" = "SD" ]; then
-					doLog v "sdcard found at /dev/block/mmcblk$MMC_NUM..."
-
-					MMC_DEVICE=/dev/block/mmcblk${MMC_NUM}
-					MMC_PARTITIONS="`$BB fdisk -l $MMC_DEVICE | $BB awk '/^\// {print $1}'`"
-					MMC_MM="`$BB ls -l $MMC_DEVICE | $BB tr -s " " | $BB sed -ne "s/^.*[ ]\([0-9]\+\),[ ]\([0-9]\+\)[ ].*$/\1:\2/p"`"
-
-					$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Checking device $MMC_MM to prepare for Optimization..."
-
-					if $BB [ -e /sys/devices/virtual/bdi/$MMC_MM/read_ahead_kb ]; then
-						doLog v "Setting sdcard readahead to ${PROP_READAHEAD}kb..."
-						$BB echo $PROP_READAHEAD > /sys/devices/virtual/bdi/$MMC_MM/read_ahead_kb
-					fi
-
-					for i in $MMC_PARTITIONS; do
-						$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Checking file system type on $i..."
-
-						if $BB [ ! -z "`$BB blkid | $BB grep $i | $BB grep " TYPE="`" ]; then
-							FS_TYPE=`$BB blkid $i | $BB sed 's/.*TYPE=\"\([^\"]*\)\".*/\1/g'`
-
-							case "$FS_TYPE" in 
-								"swap")
-									$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found swap partition..."
-									$BB [ -z "$MMC_SWAP" ] && MMC_SWAP="$i"
-								;;
-
-								*)
-									if $BB [ "$FS_TYPE" != "vfat" ] && $BB [ ! -z "`$BB cat /proc/filesystems | $BB grep $FS_TYPE | $BB grep -v 'nodev'`" ]; then
-										if $BB [ -z "$MMC_SDEXT" ]; then
-											$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found sd-ext ($FS_TYPE) partition..."
-											MMC_SDEXT="$i"
-											$BB [ "$PROP_EXTFS" = "auto" ] && MMC_SDEXT_FS="$FS_TYPE" || MMC_SDEXT_FS="$PROP_EXTFS"
-
-										else
-											$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found inactive ($FS_TYPE) partition..."
-										fi
-
-									elif $BB [ -z "$MMC_SDEXT" ] && $BB [ "$FS_TYPE" != "vfat" ]; then
-										doLog w "The device $i does not contain a supported sd-ext filesystem!"
-
-									elif $BB [ "$FS_TYPE" = "vfat" ] && $BB [ "$CACHE_DEBUG" = "1" ]; then
-										doLog d "Found sdcard (FAT32) partition..."
-									fi
-								;;
-							esac
-
-						else
-							doLog w "Using secondary file system identification method for $i!"
-							FS_NUMBER="`$BB fdisk -l $MMC_DEVICE | $BB grep $i | $BB tr -s " " | $BB rev | $BB cut -d " " -f 2 | $BB rev`"
-
-							case "$FS_NUMBER" in 
-								"82")
-									$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found swap partition..."
-									$BB [ -z "$MMC_SWAP" ] && MMC_SWAP="$i"
-								;;
-
-								"83")
-									# Make sure that it is not the first partition. Some busybox versions write "83" even on vfat partitions
-									if $BB [ -z "$MMC_SDEXT" ] || $BB [ -z "`$BB echo $i | $BB grep -e 'p1$'`" ]; then
-										$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found sd-ext partition..."
-										MMC_SDEXT="$i"
-										MMC_SDEXT_FS="$PROP_EXTFS"
-
-									elif $BB [ ! -z "`$BB echo $i | $BB grep -e 'p1$'`" ]; then
-										$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found sdcard (FAT32) partition..."
-
-									else
-										$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found inactive partition..."
-									fi
-								;;
-
-								*)
-									$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found `$BB [ -z "`$BB echo $i | $BB grep -e 'p1$'`" ] && echo 'unknown' || echo 'sdcard (FAT32)'` partition..."
-								;;
-							esac
-						fi
-					done
-
-					break 2
+			if $BB [ ! -z "$MMC_DEVICE" ]; then
+				if [ -b $MMC_DEVICE ]; then
+					break
 				fi
-			done
+
+			else
+				for MMC_NUM in `seq 0 9`; do
+					$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Checking /sys/block/mmcblk$MMC_NUM/device/type for sdcard flag..."
+
+					if $BB [ -e /sys/block/mmcblk$MMC_NUM/device/type ] && $BB [ "`$BB cat /sys/block/mmcblk$MMC_NUM/device/type`" = "SD" ]; then
+						MMC_DEVICE=/dev/block/mmcblk${MMC_NUM}; break 2
+					fi
+				done
+			fi
 
 			if $BB [ $MMC_TRIES -gt 7 ]; then
 				doLog e "Timedout waiting for sdcard to initiate!"; break
@@ -578,6 +518,35 @@ for loopwrapper in true; do
 				sleep 1
 			fi
 		done
+
+		if $BB [ ! -z "$MMC_DEVICE" ]; then
+			doLog v "sdcard found at /dev/block/mmcblk$MMC_NUM..."
+
+			MMC_PARTITIONS="`$BB fdisk -l $MMC_DEVICE | $BB awk '/^\// {print $1}'`"
+			MMC_MM="`$BB ls -l $MMC_DEVICE | $BB tr -s " " | $BB sed -ne "s/^.*[ ]\([0-9]\+\),[ ]\([0-9]\+\)[ ].*$/\1:\2/p"`"
+
+			$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Checking device $MMC_MM to prepare for Optimization..."
+
+			if $BB [ -e /sys/devices/virtual/bdi/$MMC_MM/read_ahead_kb ]; then
+				doLog v "Setting sdcard readahead to ${PROP_READAHEAD}kb..."
+				$BB echo $PROP_READAHEAD > /sys/devices/virtual/bdi/$MMC_MM/read_ahead_kb
+			fi
+
+			for i in $MMC_PARTITIONS; do
+				if $BB [ -z "$MMC_FAT" ]; then
+					$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found Fat32 partition at $i..."
+					MMC_FAT=$i
+
+				elif $BB [ -z "$MMC_SDEXT" ]; then
+					$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found sd-ext partition at $i..."
+					MMC_SDEXT=$i
+
+				else
+					$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Found SWAP partition at $i..."
+					MMC_SWAP=$i; break
+				fi
+			done
+		fi
 
 		# ////////////////////////////////////////////////////////////////////////////////////////////
 		# -------------------------------------------------------------------------------------------
@@ -632,12 +601,13 @@ for loopwrapper in true; do
 
 				doLog v "Unmounting the sd-ext partition in order to continue..."
 				$BB umount $MMC_SDEXT
+				sync
 			fi
 
 			if $BB [ -z "`$BB cat /proc/mounts | $BB grep $MMC_DEVNAME`" ] && $BB [ -z "`$BB cat /proc/mounts | $BB grep $MMC_DEVNUM`" ]; then
-				if $BB [ "$MMC_SDEXT_FS" != "auto" ] && $BB [ -z "`$BB cat /proc/filesystems | $BB grep $MMC_SDEXT_FS | $BB grep -v 'nodev'`" ]; then
-					doLog w "The defined force sd-ext filesystem type $MMC_SDEXT_FS is not supported. Switching to auto detection!"
-					MMC_SDEXT_FS="auto"
+				if $BB [ "$PROP_EXTFS" != "auto" ] && $BB [ -z "`$BB cat /proc/filesystems | $BB grep $PROP_EXTFS | $BB grep -v 'nodev'`" ]; then
+					doLog w "The defined force sd-ext filesystem type $PROP_EXTFS is not supported. Switching to auto detection!"
+					PROP_EXTFS="auto"
 				fi
 
 				if $BB [ "$PROP_FSCHK" = "1" ]; then
@@ -657,7 +627,7 @@ for loopwrapper in true; do
 				fi
 
 				if $BB [ "$PROP_JOURNAL" != "-1" ]; then
-					if $BB [ "$MMC_SDEXT_FS" = "ext4" ]; then
+					if $BB [ "$PROP_EXTFS" = "ext4" ]; then
 						$BB [ ! -z "`$BB which tune2fs`" ] && CMD_TUNE2FS="`$BB which tune2fs`" || CMD_TUNE2FS="$BB tune2fs"
 
 						if $BB [ "$PROP_JOURNAL" = "0" ]; then
@@ -669,7 +639,7 @@ for loopwrapper in true; do
 							$CMD_TUNE2FS -O has_journal $MMC_SDEXT
 						fi
 
-					elif $BB [ "$MMC_SDEXT_FS" = "ext3" ]; then
+					elif $BB [ "$PROP_EXTFS" = "ext3" ]; then
 						doLog v "Disabling journal on sd-ext..."
 						$BB [ -z "$OPTIONS" ] && OPTIONS="noload" || OPTIONS="$OPTIONS,noload"
 					fi
@@ -680,9 +650,11 @@ for loopwrapper in true; do
 					$BB [ -z "$OPTIONS" ] && OPTIONS="noatime,nodiratime" || OPTIONS="$OPTIONS,noatime,nodiratime"
 				fi
 
+				$BB [ -z "$OPTIONS" ] && OPTIONS="noauto_da_alloc,data=ordered,commit=15,barrier=1,nouser_xattr,errors=continue,nosuid,nodev" || OPTIONS="$OPTIONS,noauto_da_alloc,data=ordered,commit=15,barrier=1,nouser_xattr,errors=continue,nosuid,nodev"
+
 				if $BB [ "$PROP_RMOUNT" = "1" ]; then
 					doLog v "Moving internal nand mount point from /data to /sd-ext..."
-					$BB mount --move /data /sd-ext
+					$BB mount --move /data /sd-ext; sync
 
 					if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " /sd-ext "`" ]; then
 						doProp set mounts2sd.rmount.status "loaded"
@@ -696,13 +668,13 @@ for loopwrapper in true; do
 				fi
 
 				if $BB [ "$PROP_RMOUNT" != "1" ] || $BB [ "`doProp get mounts2sd.rmount.status`" = "loaded" ]; then
-					$BB [ ! -z "$OPTIONS" ] && $BB mount -o $OPTIONS -t $PROP_EXTFS $MMC_SDEXT $SDEXT_MOUNTPOINT || $BB mount -t $PROP_EXTFS $MMC_SDEXT $SDEXT_MOUNTPOINT
+					$BB mount -o $OPTIONS -t $PROP_EXTFS $MMC_SDEXT $SDEXT_MOUNTPOINT; sync
 
 					if $BB [ -z "`$BB cat /proc/mounts | $BB grep -w $MMC_SDEXT`" ] && $BB [ "$PROP_EXTFS" != "auto" ]; then
 						doLog w "Could not mount sd-ext as $PROP_EXTFS. Trying again with auto detection and no additional options!"
 						PROP_EXTFS="auto"		
 
-						$BB mount -t $PROP_EXTFS $MMC_SDEXT $SDEXT_MOUNTPOINT
+						$BB mount -t $PROP_EXTFS $MMC_SDEXT $SDEXT_MOUNTPOINT; sync
 					fi
 
 					if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep -w $MMC_SDEXT`" ]; then
@@ -718,8 +690,15 @@ for loopwrapper in true; do
 						DO_REVERT="`$BB cat /init.rc | $BB grep mkdir | $BB grep ' /data' | $BB grep -ve ' \/data\(\/\(local\|misc\|system\|tombstones\|property\|data\|dalvik\-cache\|app\(\-private\|\-system\)\?\)\(\/[^\/]\+\)*\)\? ' | $BB tr -s ' ' | $BB sed 's/mkdir \/data\/\([^ ]\+\).*$/\1/'`"
 						DO_REVERT="$DO_REVERT local misc system tombstones"
 
+						if ( $BB [ ! -d /data/data ] || $BB [ -z "`$BB find /data/data -type f`" ] ) && ( $BB [ ! -d /sd-ext/data ] || $BB [ -z "`$BB find /sd-ext/data -type f`" ] ); then
+							# ICS creates issues for some reason when /data/data is moved to sd-ext before any data exists. 
+							$BB [ "$PROP_RMOUNT" = "1" ] && DO_MOVE="$DO_MOVE data" || DO_REVERT="$DO_REVERT data"
+
+						else
+							$BB [ "$PROP_DATA" = "1" ] && DO_MOVE="$DO_MOVE data" || DO_REVERT="$DO_REVERT data"
+						fi
+
 						$BB [ "$PROP_DALVIK" = "1" ] && DO_MOVE="$DO_MOVE dalvik-cache" || DO_REVERT="$DO_REVERT dalvik-cache"
-						$BB [ "$PROP_DATA" = "1" ] && DO_MOVE="$DO_MOVE data" || DO_REVERT="$DO_REVERT data"
 						$BB [ "$PROP_APPS" = "1" ] && DO_MOVE="$DO_MOVE app app-private app-system" || DO_REVERT="$DO_REVERT app app-private app-system"
 						$BB [ "$PROP_RMOUNT" = "1" ] && DO_MOVE="$DO_MOVE property" || DO_REVERT="$DO_REVERT property"
 						$BB [ "$PROP_RMOUNT" = "1" ] && MOVE_ORDER="revert move" || MOVE_ORDER="move revert secondmove"
@@ -808,7 +787,7 @@ for loopwrapper in true; do
 									if $BB [ "$DO_SKIP_LINK" != "1" ]; then
 										doLog v "Creating link between /data/$x and /sd-ext/$x..."
 
-										$BB mount --bind /sd-ext/$x /data/$x
+										$BB mount --bind /sd-ext/$x /data/$x; sync
 
 										if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " /data/$x "`" ]; then
 											$BB [ "$x" = "app" ] && doProp set mounts2sd.sdext.status.apps "loaded"
@@ -837,7 +816,7 @@ for loopwrapper in true; do
 						if $BB [ "`doProp get mounts2sd.rmount.status`" = "loaded" ]; then
 							doProp remove mounts2sd.rmount.status
 							doLog v "Moving internal nand data mount point back to /data!"
-							$BB mount --move /sd-ext /data 
+							$BB mount --move /sd-ext /data; sync
 						fi
 					fi
 				fi
@@ -913,7 +892,7 @@ for loopwrapper in true; do
 			doCreateFolder $CACHE_LOCATION "1000.2001" "0771"
 
 			doLog v "Mounting $CACHE_LOCATION at tmpfs..."
-			$BB mount -t tmpfs -o size=128M,mode=0771 tmpfs $CACHE_LOCATION
+			$BB mount -t tmpfs -o size=128M,mode=0771 tmpfs $CACHE_LOCATION; sync
 			$BB chown 1000.2001 $CACHE_LOCATION
 
 			if $BB [ ! -z "`$BB cat /proc/mounts | $BB grep " $CACHE_LOCATION "`" ]; then
@@ -935,13 +914,13 @@ for loopwrapper in true; do
 		# -------------------------------------------------------------------------------------------
 		# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-		if $BB [ "$PROP_CACHE" = "1" ] || ( $BB [ "$PROP_CACHE" = "-1" ] && $BB [ "`$BB df -m /data | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f4`" -lt 40 ] ); then
+		if $BB [ "$PROP_CACHE" = "1" ] || ( $BB [ "$PROP_CACHE" = "-1" ] && $BB [ "`$BB df -m /data | $BB tail -n1 | $BB tr -s ' ' | $BB cut -d ' ' -f4`" -lt 60 ] ); then
 			for i in /cache/data-tmp /data/local/tmp; do
 				doCreateFolder $i "2000.2000" "0771"
 			done
 
 			doLog v "Creating link between /cache/data-tmp and /data/local/tmp..."
-			$BB mount --bind /cache/data-tmp /data/local/tmp
+			$BB mount --bind /cache/data-tmp /data/local/tmp; sync
 
 			if $BB [ -z "`$BB cat /proc/mounts | $BB grep " /data/local/tmp "`" ]; then
 				doLog e "Error while linking /data/local/tmp to /cache/data-tmp!"
@@ -953,8 +932,8 @@ for loopwrapper in true; do
 		# MOUNT /CACHE/DALVIK-CACHE TO /DATA/DALVIK-CACHE IF ENABLED
 		# -------------------------------------------------------------------------------------------
 		# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-
-		if $BB [ "$PROP_CMDALVIK" = "1" ]; then
+		# We will auto enable the cmdalvik option if cache has been enabled. We do not at any time want dalvik data on an temp partition.
+		if $BB [ "`getprop dalvik.vm.dexopt-data-only`" != "1" ] && ( $BB [ "$PROP_CMDALVIK" = "1" ] || ( $BB [ "`doProp get mounts2sd.cache.status`" = "loaded" ] && $BB [ "$PROP_DLCACHE" != "1" ] ) ); then
 			$BB [ "$CACHE_DEBUG" = "1" ] && doLog d "Connecting /cache/dalvik-cache with /data/dalvik-cache..."
 
 			doCreateFolder /data/dalvik-cache
@@ -980,7 +959,7 @@ for loopwrapper in true; do
 			fi
 
 			doLog v "Creating link between /cache/dalvik-cache and /data/dalvik-cache..."
-			$BB mount --bind /data/dalvik-cache /cache/dalvik-cache
+			$BB mount --bind /data/dalvik-cache /cache/dalvik-cache; sync
 
 			$BB [ ! -z "`$BB cat /proc/mounts | $BB grep " /cache/dalvik-cache "`" ] && doProp set mounts2sd.cmdalvik.status "loaded" || doLog e "Error while linking /cache/dalvik-cache to /data/dalvik-cache!"
 		fi
@@ -1018,5 +997,12 @@ for loopwrapper in true; do
 		# Remount partitions with read permissions
 		$BB mount -o remount,ro /
 		$BB mount -o remount,ro /system
+
+		setprop ro.m2sd.path.props "$M2SD_CONFIGS"
+		setprop ro.m2sd.path.logs "$M2SD_LOGS"
+		setprop ro.m2sd.path.script "$SCRIPT_PATH"
+		setprop ro.m2sd.path.sdcard "$MMC_DEVICE"
+
+		sync
 	fi
 done
