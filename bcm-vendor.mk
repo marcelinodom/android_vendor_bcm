@@ -65,7 +65,10 @@ endif
 
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.build.date.utc=0 \
-    ro.build.display.id=BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool \
+    ro.build.display.id="BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool" \
     ro.build.romversion=BCM-$(BUILD_VERSION)U$(BUILD_UPDATE) \
-    ro.modversion=BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool \
+    ro.modversion="BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool" \
     ro.cm.version=9.0.0-RC0-$(BUILD_DATE)
+
+# Get some Gapps
+$(call inherit-product-if-exists, gapps/gapps.mk)
