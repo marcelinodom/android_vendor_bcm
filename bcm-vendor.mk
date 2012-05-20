@@ -8,10 +8,10 @@ include frameworks/base/data/sounds/NewAudio.mk
 # Extra Ringtones
 include frameworks/base/data/sounds/AudioPackageNewWave.mk
 
-ALARM_PATH := vendor/bcm/media/audio/alarms
-NOTIFICATION_PATH := vendor/bcm/media/audio/notifications
-RINGTONE_PATH := vendor/bcm/media/audio/ringtones
-UI_PATH := vendor/bcm/media/audio/ui
+ALARM_PATH := vendor/bcm/prebuild/media/audio/alarms
+NOTIFICATION_PATH := vendor/bcm/prebuild/media/audio/notifications
+RINGTONE_PATH := vendor/bcm/prebuild/media/audio/ringtones
+UI_PATH := vendor/bcm/prebuild/media/audio/ui
 
 # Alarms
 PRODUCT_COPY_FILES += \
@@ -67,65 +67,65 @@ PRODUCT_PACKAGES += \
     com.tmobile.themes
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/permissions/com.cyanogenmod.android.xml:system/etc/permissions/com.cyanogenmod.android.xml \
-    vendor/bcm/permissions/com.tmobile.software.themes.xml:system/etc/permissions/com.tmobile.software.themes.xml \
+    vendor/bcm/prebuild/permissions/com.cyanogenmod.android.xml:system/etc/permissions/com.cyanogenmod.android.xml \
+    vendor/bcm/prebuild/permissions/com.tmobile.software.themes.xml:system/etc/permissions/com.tmobile.software.themes.xml \
     packages/wallpapers/LivePicker/android.software.live_wallpaper.xml:system/etc/permissions/android.software.live_wallpaper.xml
 
 # Bring in camera effects
 PRODUCT_COPY_FILES +=  \
-    vendor/bcm/media/LMprec_508.emd:system/media/LMprec_508.emd \
-    vendor/bcm/media/PFFprec_600.emd:system/media/PFFprec_600.emd
+    vendor/bcm/prebuild/media/LMprec_508.emd:system/media/LMprec_508.emd \
+    vendor/bcm/prebuild/media/PFFprec_600.emd:system/media/PFFprec_600.emd
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/init.d/10mounts2sd:system/etc/init.d/10mounts2sd \
-    vendor/bcm/init.d/05hostname:system/etc/init.d/05hostname \
-    vendor/bcm/init.d/09mkloops:system/etc/init.d/09mkloops \
-    vendor/bcm/init.d/01sysctl:system/etc/init.d/01sysctl \
-    vendor/bcm/init.d/90threshold:system/etc/init.d/90threshold \
-    vendor/bcm/boot.d/99bash:system/etc/boot.d/99bash
+    vendor/bcm/prebuild/init.d/10mounts2sd:system/etc/init.d/10mounts2sd \
+    vendor/bcm/prebuild/init.d/05hostname:system/etc/init.d/05hostname \
+    vendor/bcm/prebuild/init.d/09mkloops:system/etc/init.d/09mkloops \
+    vendor/bcm/prebuild/init.d/01sysctl:system/etc/init.d/01sysctl \
+    vendor/bcm/prebuild/init.d/90threshold:system/etc/init.d/90threshold \
+    vendor/bcm/prebuild/boot.d/99bash:system/etc/boot.d/99bash
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/dhcpcd/01-configure:system/etc/dhcpcd/dhcpcd.d/01-configure \
-    vendor/bcm/dhcpcd/dhcpcd.conf:system/etc/dhcpcd/dhcpcd.conf \
-    vendor/bcm/dhcpcd/dhcpcd-hook:system/etc/dhcpcd/dhcpcd-hook
+    vendor/bcm/prebuild/dhcpcd/01-configure:system/etc/dhcpcd/dhcpcd.d/01-configure \
+    vendor/bcm/prebuild/dhcpcd/dhcpcd.conf:system/etc/dhcpcd/dhcpcd.conf \
+    vendor/bcm/prebuild/dhcpcd/dhcpcd-hook:system/etc/dhcpcd/dhcpcd-hook
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/etc/bash.bashrc:system/etc/bash.bashrc \
-    vendor/bcm/etc/gps.conf:system/etc/gps.conf \
-    vendor/bcm/etc/hostname:system/etc/hostname \
-    vendor/bcm/etc/hosts:system/etc/hosts \
-    vendor/bcm/etc/shells:system/etc/shells \
-    vendor/bcm/etc/SuplRootCert:system/etc/SuplRootCert \
-    vendor/bcm/etc/sysctl.conf:system/etc/sysctl.conf \
-    vendor/bcm/etc/mkshrc:system/etc/mkshrc
+    vendor/bcm/prebuild/etc/bash.bashrc:system/etc/bash.bashrc \
+    vendor/bcm/prebuild/etc/gps.conf:system/etc/gps.conf \
+    vendor/bcm/prebuild/etc/hostname:system/etc/hostname \
+    vendor/bcm/prebuild/etc/hosts:system/etc/hosts \
+    vendor/bcm/prebuild/etc/shells:system/etc/shells \
+    vendor/bcm/prebuild/etc/SuplRootCert:system/etc/SuplRootCert \
+    vendor/bcm/prebuild/etc/sysctl.conf:system/etc/sysctl.conf \
+    vendor/bcm/prebuild/etc/mkshrc:system/etc/mkshrc
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/bin/sh.bash:system/bin/sh.bash \
-    vendor/bcm/bin/su.bash:system/bin/su.bash \
-    vendor/bcm/bin/sysinit:system/bin/sysinit \
-    vendor/bcm/bin/sh:system/bin/sh \
-    vendor/bcm/bin/e2fsck:system/bin/e2fsck \
-    vendor/bcm/bin/fix_permissions:system/bin/fix_permissions
+    vendor/bcm/prebuild/bin/sh.bash:system/bin/sh.bash \
+    vendor/bcm/prebuild/bin/su.bash:system/bin/su.bash \
+    vendor/bcm/prebuild/bin/sysinit:system/bin/sysinit \
+    vendor/bcm/prebuild/bin/sh:system/bin/sh \
+    vendor/bcm/prebuild/bin/e2fsck:system/bin/e2fsck \
+    vendor/bcm/prebuild/bin/fix_permissions:system/bin/fix_permissions
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/xbin/bash:system/xbin/bash
+    vendor/bcm/prebuild/xbin/bash:system/xbin/bash
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/media/bootanimation.zip:system/media/bootanimation.zip
+    vendor/bcm/prebuild/media/bootanimation.zip:system/media/bootanimation.zip
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/lib/libext2_blkid.so:system/lib/libext2_blkid.so \
-    vendor/bcm/lib/libext2_com_err.so:system/lib/libext2_com_err.so \
-    vendor/bcm/lib/libext2_e2p.so:system/lib/libext2_e2p.so \
-    vendor/bcm/lib/libext2fs.so:system/lib/libext2fs.so \
-    vendor/bcm/lib/libext2_profile.so:system/lib/libext2_profile.so \
-    vendor/bcm/lib/libext2_uuid.so:system/lib/libext2_uuid.so
+    vendor/bcm/prebuild/lib/libext2_blkid.so:system/lib/libext2_blkid.so \
+    vendor/bcm/prebuild/lib/libext2_com_err.so:system/lib/libext2_com_err.so \
+    vendor/bcm/prebuild/lib/libext2_e2p.so:system/lib/libext2_e2p.so \
+    vendor/bcm/prebuild/lib/libext2fs.so:system/lib/libext2fs.so \
+    vendor/bcm/prebuild/lib/libext2_profile.so:system/lib/libext2_profile.so \
+    vendor/bcm/prebuild/lib/libext2_uuid.so:system/lib/libext2_uuid.so
 
 # Compcache/Zram support
 PRODUCT_COPY_FILES += \
-    vendor/bcm/etc/init.local.rc:system/etc/init.local.rc \
-    vendor/bcm/bin/compcache:system/bin/compcache \
-    vendor/bcm/bin/handle_compcache:system/bin/handle_compcache
+    vendor/bcm/prebuild/etc/init.local.rc:system/etc/init.local.rc \
+    vendor/bcm/prebuild/bin/compcache:system/bin/compcache \
+    vendor/bcm/prebuild/bin/handle_compcache:system/bin/handle_compcache
 
 BUILD_DATE := $(shell date +%Y%M%d)
 BUILD_USER := $(shell whoami)
