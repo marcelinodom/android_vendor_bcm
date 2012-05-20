@@ -35,8 +35,7 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/bin/e2fsck:system/bin/e2fsck
 
 PRODUCT_COPY_FILES += \
-    vendor/bcm/xbin/bash:system/xbin/bash \
-    vendor/bcm/xbin/busybox.m2sd:system/xbin/busybox.m2sd
+    vendor/bcm/xbin/bash:system/xbin/bash
 
 PRODUCT_COPY_FILES += \
     vendor/bcm/media/bootanimation.zip:system/media/bootanimation.zip
