@@ -8,10 +8,10 @@ include frameworks/base/data/sounds/NewAudio.mk
 # Extra Ringtones
 include frameworks/base/data/sounds/AudioPackageNewWave.mk
 
-ALARM_PATH := vendor/bcm/prebuilt/media/audio/alarms
-NOTIFICATION_PATH := vendor/bcm/prebuilt/media/audio/notifications
-RINGTONE_PATH := vendor/bcm/prebuilt/media/audio/ringtones
-UI_PATH := vendor/bcm/prebuilt/media/audio/ui
+ALARM_PATH := vendor/bcm/prebuilt/audio/alarms
+NOTIFICATION_PATH := vendor/bcm/prebuilt/audio/notifications
+RINGTONE_PATH := vendor/bcm/prebuilt/audio/ringtones
+UI_PATH := vendor/bcm/prebuilt/audio/ui
 
 # Alarms
 PRODUCT_COPY_FILES += \
@@ -140,9 +140,9 @@ endif
 
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.build.date.utc=0 \
-    ro.build.display.id="BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool" \
+    ro.build.display.id=BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool \
     ro.build.romversion=BCM-$(BUILD_VERSION)U$(BUILD_UPDATE) \
-    ro.modversion="BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool" \
+    ro.modversion=BCM $(BUILD_VERSION) Update $(BUILD_UPDATE) by DK_Zero-Cool \
     ro.cm.version=9.0.0-RC0-$(BUILD_DATE)
 
 # CM Configs
