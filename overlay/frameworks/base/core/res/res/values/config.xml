@@ -23,4 +23,8 @@
     <!-- Enable Lock Screen Rotation. -->
     <bool name="config_enableLockScreenRotation">true</bool>
 
+    <!-- default to disabling the menu key. The CM setting to
+         do this is a no-op unless the below item is true -->
+    <bool name="config_disableMenuKeyInLockScreen">true</bool>
+
 </resources>
