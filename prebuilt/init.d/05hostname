@@ -13,23 +13,25 @@ busybox mount -o remount,rw /system
 if busybox [ ! -f /system/etc/hosts ]; then
 	busybox echo "127.0.0.1 localhost localdomain" > /system/etc/hosts
 
-elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.1'`" ]; then
+elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep -e '127\.0\.0\.1[^\.]\+$'`" ]; then
 	busybox echo "127.0.0.1 localhost localdomain" >> /system/etc/hosts
 
-elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.1' | busybox grep 'localhost'`" ]; then
-	busybox mv /system/etc/hosts /system/etc/hosts.temp
-	busybox cat /system/etc/hosts.temp | busybox sed 's/\(127\.0\.0\.1\)[ \t]*\([^ \t\n\r\s]*\)/\1 localhost/' >> /system/etc/hosts
-	busybox rm -rf /system/etc/hosts.temp
+elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep -e '127\.0\.0\.1[^\.]\+$' | busybox grep 'localhost'`" ]; then
+	FILE_LINE="`busybox cat /system/etc/hosts | busybox grep '127.0.0.1' | busybox head -n1`"
+
+	busybox sed "s/$FILE_LINE/127.0.0.1 localhost/g" /system/etc/hosts > /system/etc/hosts.tmp
+	busybox mv -f /system/etc/hosts.tmp /system/etc/hosts
 fi
 
 if busybox [ "$HOSTNAME" != "localhost" ]; then
-	if busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.2'`" ]; then
-		busybox echo "127.0.0.2 $HOSTNAME" >> /system/etc/hosts
+	if busybox [ -z "`busybox cat /system/etc/hosts | busybox grep -e '127\.0\.0\.1[^\.]\+$' | busybox grep -v 'localhost'`" ]; then
+		busybox echo "127.0.0.1 $HOSTNAME" >> /system/etc/hosts
 
-	elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep '127.0.0.2' | grep "$HOSTNAME"`" ]; then
-		busybox mv /system/etc/hosts /system/etc/hosts.temp
-		busybox cat /system/etc/hosts.temp | busybox sed "s/\(127\.0\.0\.2\)[ \t]*\([^ \t\n\r\s]*\)/\1 $HOSTNAME/" >> /system/etc/hosts
-		busybox rm -rf /system/etc/hosts.temp
+	elif busybox [ -z "`busybox cat /system/etc/hosts | busybox grep -e '127\.0\.0\.1[^\.]\+$' | grep "$HOSTNAME"`" ]; then
+		FILE_LINE="`busybox cat /system/etc/hosts | busybox grep -e '127\.0\.0\.1[^\.]\+$' | busybox grep -v 'localhost' | busybox head -n1`"
+
+		busybox sed "s/$FILE_LINE/127.0.0.1 $HOSTNAME/g" /system/etc/hosts > /system/etc/hosts.tmp
+		busybox mv -f /system/etc/hosts.tmp /system/etc/hosts
 	fi
 fi
 
