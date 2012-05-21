@@ -688,7 +688,7 @@ for loopwrapper in true; do
 
 						DO_CREATE="`$BB cat /init.rc | $BB grep mkdir | $BB grep ' /data' | $BB grep -e ' \/data\/[^\/]\+\(\/[^\/]\+\)\+ ' | $BB tr -s ' ' | $BB sed 's/mkdir \(\/data\/[^ ]\+\).*$/\1/'`"
 						DO_REVERT="`$BB cat /init.rc | $BB grep mkdir | $BB grep ' /data' | $BB grep -ve ' \/data\(\/\(local\|misc\|system\|tombstones\|property\|data\|dalvik\-cache\|app\(\-private\|\-system\)\?\)\(\/[^\/]\+\)*\)\? ' | $BB tr -s ' ' | $BB sed 's/mkdir \/data\/\([^ ]\+\).*$/\1/'`"
-						DO_REVERT="$DO_REVERT local misc system tombstones"
+						DO_REVERT="$DO_REVERT local tombstones"
 
 						if ( $BB [ ! -d /data/data ] || $BB [ -z "`$BB find /data/data -type f`" ] ) && ( $BB [ ! -d /sd-ext/data ] || $BB [ -z "`$BB find /sd-ext/data -type f`" ] ); then
 							# ICS creates issues for some reason when /data/data is moved to sd-ext before any data exists. 
@@ -700,7 +700,7 @@ for loopwrapper in true; do
 
 						$BB [ "$PROP_DALVIK" = "1" ] && DO_MOVE="$DO_MOVE dalvik-cache" || DO_REVERT="$DO_REVERT dalvik-cache"
 						$BB [ "$PROP_APPS" = "1" ] && DO_MOVE="$DO_MOVE app app-private app-system" || DO_REVERT="$DO_REVERT app app-private app-system"
-						$BB [ "$PROP_RMOUNT" = "1" ] && DO_MOVE="$DO_MOVE property" || DO_REVERT="$DO_REVERT property"
+						$BB [ "$PROP_RMOUNT" = "1" ] && DO_MOVE="$DO_MOVE property misc system" || DO_REVERT="$DO_REVERT property misc system"
 						$BB [ "$PROP_RMOUNT" = "1" ] && MOVE_ORDER="revert move" || MOVE_ORDER="move revert secondmove"
 
 						for action in $MOVE_ORDER; do
