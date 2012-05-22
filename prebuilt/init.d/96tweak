@@ -27,9 +27,9 @@ done
 
 if [ -e /proc/sys/vm/swappiness ]; then
 	if [ $(free | grep Swap | $BB tr -s ' ' | cut -d ' ' -f2) -eq 0 ]; then
-		echo "20" > /proc/sys/vm/swappiness
-	else
 		echo "0" > /proc/sys/vm/swappiness
+	else
+		echo "20" > /proc/sys/vm/swappiness
 	fi
 fi
 
