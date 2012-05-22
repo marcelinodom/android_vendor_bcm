@@ -1,0 +1,17 @@
+#!/system/bin/sh
+# Automatic ZipAlign by Wes Garner
+
+for apk in /data/app/*.apk ; do
+	zipalign -c 4 $apk
+
+	ZIPCHECK=$?
+
+	if [ $ZIPCHECK -eq 1 ]; then
+		zipalign -f 4 $apk /cache/$(basename $apk)
+
+		if [ -e /cache/$(basename $apk) ]; then
+			cp -f -p /cache/$(basename $apk) $apk
+			rm /cache/$(basename $apk)
+		fi
+	fi
+done

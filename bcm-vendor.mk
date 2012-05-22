@@ -82,6 +82,8 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/prebuilt/init.d/09mkloops:system/etc/init.d/09mkloops \
     vendor/bcm/prebuilt/init.d/01sysctl:system/etc/init.d/01sysctl \
     vendor/bcm/prebuilt/init.d/90threshold:system/etc/init.d/90threshold \
+    vendor/bcm/prebuilt/init.d/93zipalign:system/etc/init.d/93zipalign \
+    vendor/bcm/prebuilt/init.d/96tweak:system/etc/init.d/96tweak \
     vendor/bcm/prebuilt/boot.d/99bash:system/etc/boot.d/99bash
 
 PRODUCT_COPY_FILES += \

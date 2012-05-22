@@ -1,0 +1,19 @@
+#!/system/bin/sh
+# Tweaks & Optimizations by LeeDrOiD
+
+DBS="`find /data -iname '*.db'`"
+
+for i in $DBS; do
+	sqlite3 $i 'VACUUM;'
+done
+
+for i in /cache /data/dalvik-cache; do
+	rm -rf ${i}/*.apk
+	rm -rf ${i}/*.tmp
+done
+
+for i in /sys/block/*; do
+	if [ -e $i/queue/rotational ]; then
+    		echo 0 > $i/queue/rotational
+	fi
+done
