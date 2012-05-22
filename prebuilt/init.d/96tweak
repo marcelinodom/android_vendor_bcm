@@ -1,4 +1,6 @@
 #!/system/bin/sh
+
+##########################################################
 # Tweaks & Optimizations by LeeDrOiD
 
 DBS="`find /data -iname '*.db'`"
@@ -12,8 +14,46 @@ for i in /cache /data/dalvik-cache; do
 	rm -rf ${i}/*.tmp
 done
 
+##########################################################
+# Tweaks & Optimizations based on http://diaduit.bounceme.net/
+
 for i in /sys/block/*; do
-	if [ -e $i/queue/rotational ]; then
-    		echo 0 > $i/queue/rotational
+	[ -e $i/queue/rotational ] && echo 0 > $i/queue/rotational
+	[ -e $i/queue/iosched/low_latency ] && echo 1 > $i/queue/iosched/low_latency
+	[ -e $i/queue/iosched/back_seek_penalty ] && echo 1 > $i/queue/iosched/back_seek_penalty
+	[ -e $i/queue/iosched/back_seek_max ] && echo 1000000000 > $i/queue/iosched/back_seek_max
+	[ -e $i/queue/iosched/slice_idle ] && echo 3 > $i/queue/iosched/slice_idle
+done
+
+if [ -e /proc/sys/vm/swappiness ]; then
+	if [ $(free | grep Swap | $BB tr -s ' ' | cut -d ' ' -f2) -eq 0 ]; then
+		echo "20" > /proc/sys/vm/swappiness
+	else
+		echo "0" > /proc/sys/vm/swappiness
+	fi
+fi
+
+## VM OPTIMIZATION, FOR INFO: http://www.cyrius.com/debian/nslu2/linux-on-flash.html
+[ -e /proc/sys/min_free_kbytes ] && echo "4096" > /proc/sys/min_free_kbytes
+[ -e /proc/sys/vm/laptop_mode ] && echo "120" > /proc/sys/vm/laptop_mode
+[ -e /proc/sys/vm/dirty_ratio ] && echo "25" > /proc/sys/vm/dirty_ratio
+[ -e /proc/sys/vm/dirty_background_ratio ] && echo "5" > /proc/sys/vm/dirty_background_ratio
+[ -e /proc/sys/vm/vfs_cache_pressure ] && echo "20" > /proc/sys/vm/vfs_cache_pressure
+[ -e /proc/sys/vm/dirty_expire_centisecs ] && echo "120000" > /proc/sys/vm/dirty_expire_centisecs
+[ -e /proc/sys/vm/dirty_writeback_centisecs ] && echo "120000" > /proc/sys/vm/dirty_writeback_centisecs
+
+## NO MORE NOSENSE LOG AND TOMBS
+for i in /data/tombstones /data/system/usagestats /data/system/dropbox /data/system/uiderrors.txt; do
+	if [ ! -e $i ] || [ "`readlink -f $i`" != "/dev/null" ]; then
+		if [ -e $i ]; then 
+			rm -rf $i
+		fi
+
+		ln -s /dev/null $i
 	fi
 done
+
+for i in /dev/log/events /dev/log/radio /dev/log/system; do
+	chmod 400 $i
+done
+
