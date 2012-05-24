@@ -1,28 +1,57 @@
 #!/system/bin/sh
 
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
-export LD_LIBRARY_PATH=/vendor/lib:/system/lib
-export ANDROID_BOOTLOGO=1
-export ANDROID_ROOT=/system
-export ANDROID_ASSETS=/system/app
-export ANDROID_DATA=/data
-export EXTERNAL_STORAGE=/mnt/sdcard
-export ASEC_MOUNTPOINT=/mnt/asec
-export LOOP_MOUNTPOINT=/mnt/obb
-export SD_EXT_DIRECTORY=/sd-ext
-export BOOTCLASSPATH=/system/framework/core.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/filterfw.jar
-export HOME=/mnt/sdcard
-export SHELL=/system/xbin/bash
-export TERM=linux
-export TERMINFO=/system/etc/terminfo
 
-for i in /system/etc/init.d/*; do
-	/system/bin/toolbox log -p v -t sysinit "Executing $i..."
+if [ -d /system/etc/init.d ]; then
+	case $(basename $0) in 
+		"sysinit") INIT_STATE="$1" ;;
+		*) INIT_STATE="`basename $0 | cut -d '.' -f2`" ;;
+	esac
 
-	if [ ! -d $i ] && [ -x $i ]; then
-		/system/bin/logwrapper $i
+	if ( [ "$INIT_STATE" != "onpostsysinit" ] && [ "$INIT_STATE" != "oncomplete" ] ) || 
+			( [ "$INIT_STATE" = "onpostsysinit" ] && [ "$(getprop init.svc.sysinit)" = "stopped" ] && [ "$(getprop init.sysinit)" != "running" ] ) || ( [ "$INIT_STATE" = "oncomplete" ] && [ "$(getprop init.svc.sysinit)" = "stopped" ] && [ "$(getprop init.sysinit)" = "stopped" ] ); then
+		if [ "$INIT_STATE" = "onsysinit" ]; then
+			# This state is running along side the boot process. Give et a second to get started
+			sleep 1
 
-	else
-		/system/bin/toolbox log -p w -t sysinit "$i is not an executable!"
+			setprop init.sysinit running
+		fi
+
+		if [ "$INIT_STATE" = "onpostsysinit" ] && [ $(getprop sys.boot_completed) -eq 1 ] && [ "$(getprop init.sysinit)" = "stopping" ]; then
+			RUN_STATES="onpostsysinit oncomplete"
+
+		elif [ "$INIT_STATE" = "onpostsysinit" ] && [ $(getprop sys.boot_completed) -eq 1 ]; then
+			RUN_STATES="oncomplete"
+
+		else
+			RUN_STATES="$INIT_STATE"
+		fi
+
+		for x in $RUN_STATES; do
+			log -p v -t sysinit "Switching to state '$x'..."
+
+			case $x in 
+				# Make it compatible with old init scripts
+				onboot|"") FILES="`find /system/etc/init.d -type f | sort`" ;;
+				*) FILES="`find /system/etc/init.d -type f -iname '*.rc' | sort`" ;;
+			esac
+
+			for i in $FILES; do
+				if [ ! -d $i ] && [ -x $i ]; then
+					log -p v -t sysinit "Executing $i..."
+					logwrapper $i $x
+
+				else
+					log -p w -t sysinit "Skipping $i. Not an executable!"
+				fi
+			done
+		done
+
+		if [ "$INIT_STATE" = "onsysinit" ]; then
+			setprop init.sysinit stopping
+
+		elif [ "$INIT_STATE" = "onpostsysinit" ]; then
+			setprop init.sysinit stopped
+		fi
 	fi
-done
+fi
