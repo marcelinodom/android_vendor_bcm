@@ -84,7 +84,7 @@ PRODUCT_COPY_FILES += \
     vendor/bcm/prebuilt/init.d/90threshold:system/etc/init.d/90threshold \
     vendor/bcm/prebuilt/init.d/93zipalign:system/etc/init.d/93zipalign \
     vendor/bcm/prebuilt/init.d/96tweak:system/etc/init.d/96tweak \
-    vendor/bcm/prebuilt/boot.d/99bash:system/etc/boot.d/99bash
+    vendor/bcm/prebuilt/init.d/99bash.rc:system/etc/init.d/99bash.rc
 
 PRODUCT_COPY_FILES += \
     vendor/bcm/prebuilt/dhcpcd/01-configure:system/etc/dhcpcd/dhcpcd.d/01-configure \
