@@ -28,7 +28,7 @@
     <int name="recipientLimit">-1</int>
 
     <!-- Maximum number of SMS message segments in a long text message before converting
-         the SMS message to an MMS message. -->
-    <int name="smsToMmsTextThreshold">100</int>
+         the SMS message to an MMS message.
+    <int name="smsToMmsTextThreshold">100</int> -->
 
 </mms_config>
